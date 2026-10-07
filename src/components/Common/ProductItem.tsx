@@ -28,17 +28,17 @@ const ProductItem = ({ item, badge }: { item: Product; badge?: string }) => {
   const handleQuickViewUpdate = () => dispatch(updateQuickView({ ...item }));
   const handleAddToCart = () => {
     dispatch(addItemToCart({ ...item, quantity: 1 }));
-    showToast.success("Added to cart");
+    showToast.success("Added to cart", `cart-${item.id}`);
   };
   const handleProductDetails = () => dispatch(updateproductDetails({ ...item }));
   
   const handleItemToWishList = () => {
     if (isInWishlist) {
       dispatch(removeItemFromWishlist(item.id));
-      showToast.success("Removed from wishlist");
+      showToast.success("Removed from wishlist", `wishlist-${item.id}`);
     } else {
       dispatch(addItemToWishlist({ ...item, status: "available", quantity: 1 }));
-      showToast.success("Added to wishlist");
+      showToast.success("Added to wishlist", `wishlist-${item.id}`);
     }
   };
 

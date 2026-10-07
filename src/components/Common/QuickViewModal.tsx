@@ -38,17 +38,18 @@ const QuickViewModal = () => {
   const handleAddToCart = () => {
     dispatch(addItemToCart({ ...product, quantity }));
     closeModal();
-    showToast.success("Added to cart");
+    showToast.success("Added to cart", `cart-${product.id}`);
   };
 
   const handleWishlist = () => {
     if (isInWishlist) {
       dispatch(removeItemFromWishlist(product.id));
-      showToast.success("Removed from wishlist");
+      showToast.success("Removed from wishlist", `wishlist-${product.id}`);
     } else {
       dispatch(addItemToWishlist({ ...product, quantity: 1, status: "available" }));
-      showToast.success("Added to wishlist");
+      showToast.success("Added to wishlist", `wishlist-${product.id}`);
     }
+    closeModal();
   };
 
   useEffect(() => {
@@ -87,22 +88,45 @@ const QuickViewModal = () => {
 
           {/* ── LEFT COLUMN: Image ── */}
           <div className="md:w-[45%] flex-shrink-0 p-4 md:p-6">
-            {/* Main product image – fixed height box */}
-            <div className="relative w-full h-[250px] md:h-[380px] rounded-xl overflow-hidden bg-[#FEF5EC]">
+            {/* Main product image – hover to zoom */}
+            <div
+              className="relative w-full h-[250px] md:h-[380px] rounded-xl overflow-hidden bg-[#FEF5EC] cursor-crosshair"
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                const img = e.currentTarget.querySelector("img");
+                if (img) {
+                  img.style.transformOrigin = `${x}% ${y}%`;
+                  img.style.transform = "scale(2)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                const img = e.currentTarget.querySelector("img");
+                if (img) {
+                  img.style.transformOrigin = "center center";
+                  img.style.transform = "scale(1)";
+                }
+              }}
+            >
               <Image
                 src={product.imgs?.previews?.[activePreview] || product.imgs?.previews?.[0] || ""}
                 alt={product.title}
                 fill
-                className="object-contain"
+                className="object-contain transition-transform duration-300 ease-out"
               />
               {/* Fullscreen icon */}
               <button
                 onClick={handlePreviewSlider}
-                className="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-gray-700 hover:text-[#C4896A] shadow-md transition-opacity"
+                className="absolute top-3 left-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-gray-700 hover:text-[#C4896A] shadow-md transition-opacity z-20 group"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
+                {/* Tooltip on hover */}
+                <span className="absolute left-10 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+                  Fullscreen
+                </span>
               </button>
             </div>
 

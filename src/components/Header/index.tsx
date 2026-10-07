@@ -7,6 +7,7 @@ import { useAppSelector } from "@/redux/store";
 import { useSelector } from "react-redux";
 import { selectTotalPrice } from "@/redux/features/cart-slice";
 import { useCartModalContext } from "@/app/context/CartSidebarModalContext";
+import { useWishlistModalContext } from "@/app/context/WishlistSidebarModalContext";
 import { usePathname } from "next/navigation";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -224,6 +225,7 @@ const Header = () => {
   const pathUrl = usePathname();
 
   const { openCartModal } = useCartModalContext();
+  const { openWishlistModal } = useWishlistModalContext();
   const product = useAppSelector((state) => state.cartReducer.items);
   const wishlistItems = useAppSelector((state) => state.wishlistReducer.items);
 
@@ -401,26 +403,24 @@ const Header = () => {
               </Link>
 
               {/* Wishlist */}
-              <Link href="/wishlist" aria-label="Wishlist">
-                <div className="relative">
-                  <IconBtn label="Wishlist" active={pathUrl === "/wishlist"}>
-                    <HeartIcon />
-                  </IconBtn>
-                  {wishlistItems.length > 0 && (
-                    <span
-                      className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[10px] font-bold text-white rounded-full leading-none"
-                      style={{
-                        minWidth: "17px",
-                        minHeight: "17px",
-                        padding: "0 3px",
-                        background: "#C4896A",
-                      }}
-                    >
-                      {wishlistItems.length}
-                    </span>
-                  )}
-                </div>
-              </Link>
+              <div className="relative">
+                <IconBtn label="Wishlist" onClick={openWishlistModal}>
+                  <HeartIcon />
+                </IconBtn>
+                {wishlistItems.length > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 flex items-center justify-center text-[10px] font-bold text-white rounded-full leading-none pointer-events-none"
+                    style={{
+                      minWidth: "17px",
+                      minHeight: "17px",
+                      padding: "0 3px",
+                      background: "#C4896A",
+                    }}
+                  >
+                    {wishlistItems.length}
+                  </span>
+                )}
+              </div>
 
               {/* Cart */}
               <div className="relative">
@@ -560,14 +560,24 @@ const Header = () => {
             <UserIcon />
             <span>Sign In</span>
           </Link>
-          <Link
-            href="/wishlist"
-            onClick={() => setSidebarOpen(false)}
-            className={`flex items-center gap-2 text-sm font-medium transition-colors duration-200 ${pathUrl === "/wishlist" ? "text-[#C4896A]" : "text-gray-600 hover:text-[#C4896A]"}`}
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              openWishlistModal();
+            }}
+            className="flex items-center gap-2 text-sm font-medium transition-colors duration-200 text-gray-600 hover:text-[#C4896A]"
           >
             <HeartIcon />
             <span>Wishlist</span>
-          </Link>
+            {wishlistItems.length > 0 && (
+              <span
+                className="text-[10px] font-bold text-white rounded-full px-1.5 py-0.5 leading-none"
+                style={{ background: "#C4896A" }}
+              >
+                {wishlistItems.length}
+              </span>
+            )}
+          </button>
         </div>
       </aside>
     </>

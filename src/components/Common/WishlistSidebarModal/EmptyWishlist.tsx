@@ -1,15 +1,15 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { useCartModalContext } from "@/app/context/CartSidebarModalContext";
+import { useWishlistModalContext } from "@/app/context/WishlistSidebarModalContext";
 
-const EmptyCart = () => {
-  const { closeCartModal } = useCartModalContext();
+const EmptyWishlist = () => {
+  const { closeWishlistModal } = useWishlistModalContext();
 
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 px-4">
-      {/* Luxurious bag icon illustration */}
-      <div 
+      {/* Luxurious heart icon illustration */}
+      <div
         className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center mb-6 relative border"
         style={{
           background: "linear-gradient(135deg, #FEF5EC 0%, #FFFAF5 100%)",
@@ -19,19 +19,17 @@ const EmptyCart = () => {
       >
         <div className="absolute inset-1.5 rounded-full border border-dashed border-[#C4896A]/40 pointer-events-none" />
         <svg
-          width="42"
-          height="42"
+          width="40"
+          height="40"
           viewBox="0 0 24 24"
           fill="none"
           stroke="#C4896A"
-          strokeWidth="1.5"
+          strokeWidth="1.6"
           strokeLinecap="round"
           strokeLinejoin="round"
           className="relative z-10"
         >
-          <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <path d="M16 10a4 4 0 0 1-8 0" />
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
       </div>
 
@@ -39,15 +37,15 @@ const EmptyCart = () => {
         className="text-lg sm:text-xl font-medium tracking-[0.15em] uppercase mb-2.5"
         style={{ fontFamily: "'Cinzel', serif", color: "#3D2B1F" }}
       >
-        Your Bag is Empty
+        Your Wishlist is Empty
       </h3>
 
-      <p className="text-xs sm:text-sm text-[#7A6B5D] max-w-[260px] leading-relaxed mb-7">
-        Discover handcrafted leather treasures designed for the discerning collector.
+      <p className="text-xs sm:text-sm text-[#7A6B5D] max-w-[270px] leading-relaxed mb-7">
+        Save your favorite handcrafted treasures to view or add to your shopping bag anytime.
       </p>
 
       <Link
-        onClick={() => closeCartModal()}
+        onClick={() => closeWishlistModal()}
         href="/shop-with-sidebar"
         className="inline-flex items-center justify-center px-7 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-[0.15em] uppercase text-white transition-all duration-300 shadow-md hover:shadow-lg"
         style={{
@@ -67,4 +65,4 @@ const EmptyCart = () => {
   );
 };
 
-export default EmptyCart;
+export default EmptyWishlist;

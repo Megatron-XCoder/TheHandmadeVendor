@@ -2,44 +2,50 @@
 import React from "react";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/redux/store";
-import { removeItemFromCart, updateCartItemQuantity } from "@/redux/features/cart-slice";
+import { removeItemFromWishlist } from "@/redux/features/wishlist-slice";
+import { addItemToCart } from "@/redux/features/cart-slice";
 import Image from "next/image";
-import Link from "next/link";
 import { showToast } from "@/utils/toast";
 
-interface CartItemType {
+interface WishlistItemType {
   id: number;
   title: string;
   price: number;
   discountedPrice: number;
-  quantity: number;
+  quantity?: number;
   imgs?: {
     thumbnails?: string[];
     previews?: string[];
   };
 }
 
-const SingleItem = ({ item }: { item: CartItemType; removeItemFromCart?: any }) => {
+const SingleItem = ({ item }: { item: WishlistItemType }) => {
   const dispatch = useDispatch<AppDispatch>();
 
   const handleRemove = () => {
-    dispatch(removeItemFromCart(item.id));
-    showToast.success("Removed from bag", `cart-remove-${item.id}`);
+    dispatch(removeItemFromWishlist(item.id));
+    showToast.success("Removed from wishlist", `wishlist-remove-${item.id}`);
   };
 
-  const handleDecrease = () => {
-    if (item.quantity > 1) {
-      dispatch(updateCartItemQuantity({ id: item.id, quantity: item.quantity - 1 }));
-    } else {
-      handleRemove();
-    }
+  const handleAddToCart = () => {
+    dispatch(
+      addItemToCart({
+        id: item.id,
+        title: item.title,
+        price: item.price,
+        discountedPrice: item.discountedPrice,
+        quantity: 1,
+        imgs: item.imgs as any,
+      })
+    );
+    dispatch(removeItemFromWishlist(item.id));
+    showToast.success("Moved to bag", `cart-add-${item.id}`);
   };
 
-  const handleIncrease = () => {
-    dispatch(updateCartItemQuantity({ id: item.id, quantity: item.quantity + 1 }));
-  };
-
-  const imageSrc = item.imgs?.thumbnails?.[0] || item.imgs?.previews?.[0] || "/images/products/product-1-sm-1.png";
+  const imageSrc =
+    item.imgs?.thumbnails?.[0] ||
+    item.imgs?.previews?.[0] ||
+    "/images/products/product-1-sm-1.png";
 
   return (
     <div
@@ -75,7 +81,7 @@ const SingleItem = ({ item }: { item: CartItemType; removeItemFromCart?: any }) 
         </h4>
 
         {/* Pricing */}
-        <div className="flex items-center gap-2 mb-2.5">
+        <div className="flex items-center gap-2 mb-1.5">
           <span className="text-xs sm:text-sm font-bold text-[#C4896A]">
             ${item.discountedPrice}
           </span>
@@ -86,32 +92,39 @@ const SingleItem = ({ item }: { item: CartItemType; removeItemFromCart?: any }) 
           )}
         </div>
 
-        {/* Quantity Controls */}
+        {/* Action: Add to Bag */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center border border-[#E3C9A8] rounded-full overflow-hidden bg-white">
-            <button
-              onClick={handleDecrease}
-              aria-label="Decrease quantity"
-              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-gray-600 hover:text-[#C4896A] hover:bg-[#FDF0E6] transition-colors text-sm"
+          <button
+            onClick={handleAddToCart}
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold text-white transition-all duration-300 shadow-sm"
+            style={{
+              background: "#876651ff",
+              fontFamily: "'Cinzel', serif",
+              letterSpacing: "0.08em",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "#C4896A";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "#3D2B1F";
+            }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              -
-            </button>
-            <span className="w-7 sm:w-8 text-center text-xs sm:text-sm font-semibold text-[#3D2B1F]">
-              {item.quantity}
-            </span>
-            <button
-              onClick={handleIncrease}
-              aria-label="Increase quantity"
-              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center text-gray-600 hover:text-[#C4896A] hover:bg-[#FDF0E6] transition-colors text-sm"
-            >
-              +
-            </button>
-          </div>
-
-          {/* Item Subtotal */}
-          <span className="text-xs sm:text-sm font-bold text-[#3D2B1F]">
-            ${(item.discountedPrice * item.quantity).toFixed(2)}
-          </span>
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <path d="M16 10a4 4 0 0 1-8 0" />
+            </svg>
+            <span>Add to Bag</span>
+          </button>
         </div>
       </div>
 

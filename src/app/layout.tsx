@@ -5,14 +5,17 @@ import "./css/style.css";
 
 import { ModalProvider } from "./context/QuickViewModalContext";
 import { CartModalProvider } from "./context/CartSidebarModalContext";
+import { WishlistModalProvider } from "./context/WishlistSidebarModalContext";
 import { ReduxProvider } from "@/redux/provider";
 import QuickViewModal from "@/components/Common/QuickViewModal";
 import CartSidebarModal from "@/components/Common/CartSidebarModal";
+import WishlistSidebarModal from "@/components/Common/WishlistSidebarModal";
 import { PreviewSliderProvider } from "./context/PreviewSliderContext";
 import PreviewSliderModal from "@/components/Common/PreviewSlider";
 
 import ScrollToTop from "@/components/Common/ScrollToTop";
 import PreLoader from "@/components/Common/PreLoader";
+import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({
   children,
@@ -39,15 +42,30 @@ export default function RootLayout({
           <>
             <ReduxProvider>
               <CartModalProvider>
-                <ModalProvider>
-                  <PreviewSliderProvider>
-                    {children}
+                <WishlistModalProvider>
+                  <ModalProvider>
+                    <PreviewSliderProvider>
+                      {children}
 
-                    <QuickViewModal />
-                    <CartSidebarModal />
-                    <PreviewSliderModal />
-                  </PreviewSliderProvider>
-                </ModalProvider>
+                      <QuickViewModal />
+                      <CartSidebarModal />
+                      <WishlistSidebarModal />
+                      <PreviewSliderModal />
+
+                      <Toaster
+                        position="top-right"
+                        containerStyle={{
+                          top: 80,
+                          right: 16,
+                          zIndex: 9999999,
+                        }}
+                        toastOptions={{
+                          duration: 3000,
+                        }}
+                      />
+                    </PreviewSliderProvider>
+                  </ModalProvider>
+                </WishlistModalProvider>
               </CartModalProvider>
             </ReduxProvider>
             <ScrollToTop />
