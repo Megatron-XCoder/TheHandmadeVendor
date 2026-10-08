@@ -9,6 +9,7 @@ import { selectTotalPrice } from "@/redux/features/cart-slice";
 import { useCartModalContext } from "@/app/context/CartSidebarModalContext";
 import { useWishlistModalContext } from "@/app/context/WishlistSidebarModalContext";
 import { usePathname } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Icon components
@@ -229,6 +230,41 @@ const Header = () => {
   const product = useAppSelector((state) => state.cartReducer.items);
   const wishlistItems = useAppSelector((state) => state.wishlistReducer.items);
 
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Supabase Auth listener
+  useEffect(() => {
+    try {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => {
+        setCurrentUser(data.user);
+      });
+      const { data: authListener } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          setCurrentUser(session?.user ?? null);
+        }
+      );
+      return () => {
+        authListener.subscription.unsubscribe();
+      };
+    } catch (e) {
+      // Supabase unconfigured
+    }
+  }, []);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    if (userMenuOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [userMenuOpen]);
+
   // Sticky behaviour
   useEffect(() => {
     const onScroll = () => setSticky(window.scrollY >= 60);
@@ -395,12 +431,75 @@ const Header = () => {
                 )}
               </div>
 
-              {/* Profile */}
-              <Link href="/signin" aria-label="Sign in">
-                <IconBtn label="Sign in" active={pathUrl === "/signin" || pathUrl === "/profile"}>
-                  <UserIcon />
-                </IconBtn>
-              </Link>
+              {/* Profile / Account */}
+              {currentUser ? (
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    aria-label="User account"
+                    className="relative"
+                  >
+                    <IconBtn label="My Account" active={userMenuOpen}>
+                      <UserIcon />
+                    </IconBtn>
+                    <span
+                      className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none"
+                      style={{ background: "#C4896A" }}
+                    />
+                  </button>
+
+                  {userMenuOpen && (
+                    <div
+                      className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border p-3 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                      style={{ borderColor: "#E3C9A8" }}
+                    >
+                      <div className="px-3 py-2 border-b border-[#E3C9A8]/40 mb-2">
+                        <span
+                          className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#C4896A] block"
+                          style={{ fontFamily: "'Cinzel', serif" }}
+                        >
+                          Atelier Member
+                        </span>
+                        <p className="text-xs font-medium text-[#3D2B1F] truncate mt-0.5">
+                          {currentUser.user_metadata?.first_name
+                            ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name || ""}`.trim()
+                            : currentUser.email}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1 text-xs">
+                        <Link
+                          href="/my-account"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#3D2B1F] hover:bg-[#FEF5EC] transition-colors"
+                        >
+                          <span>Orders & Privileges</span>
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const supabase = createClient();
+                            await supabase.auth.signOut();
+                            setUserMenuOpen(false);
+                            window.location.href = "/";
+                          }}
+                          className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link href="/signin" aria-label="Sign in">
+                  <IconBtn label="Sign in" active={pathUrl === "/signin" || pathUrl === "/profile"}>
+                    <UserIcon />
+                  </IconBtn>
+                </Link>
+              )}
 
               {/* Wishlist */}
               <div className="relative">
@@ -424,7 +523,7 @@ const Header = () => {
 
               {/* Cart */}
               <div className="relative">
-                <IconBtn label="Cart" onClick={openCartModal} active={pathUrl === "/cart"}>
+                <IconBtn label="Cart" onClick={openCartModal}>
                   <CartIcon />
                 </IconBtn>
                 {product.length > 0 && (

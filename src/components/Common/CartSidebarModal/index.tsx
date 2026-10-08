@@ -168,9 +168,8 @@ const CartSidebarModal = () => {
                 </svg>
               </Link>
 
-              <Link
+              <button
                 onClick={closeCartModal}
-                href="/cart"
                 className="w-full flex items-center justify-center py-2.5 px-6 rounded-full text-xs sm:text-sm font-medium tracking-[0.15em] uppercase border transition-all duration-300"
                 style={{
                   borderColor: "#3D2B1F",
@@ -189,8 +188,8 @@ const CartSidebarModal = () => {
                   (e.currentTarget as HTMLElement).style.color = "#3D2B1F";
                 }}
               >
-                View Shopping Bag
-              </Link>
+                Continue Shopping
+              </button>
             </div>
           </div>
         )}

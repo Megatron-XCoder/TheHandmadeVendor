@@ -44,12 +44,6 @@ export const menuData: Menu[] = [
         path: "/checkout",
       },
       {
-        id: 65,
-        title: "Cart",
-        newTab: false,
-        path: "/cart",
-      },
-      {
         id: 67,
         title: "Sign in",
         newTab: false,
