@@ -11,6 +11,8 @@ import {
   syncWishlistWithDatabase,
   persistCartItemToDatabase,
   removeCartItemFromDatabase,
+  persistWishlistItemToDatabase,
+  removeWishlistItemFromDatabase,
 } from "@/utils/cartSync";
 
 export default function StoreHydrator() {
@@ -22,6 +24,7 @@ export default function StoreHydrator() {
   const isCartHydrated = useRef(false);
   const isWishlistHydrated = useRef(false);
   const previousCartIds = useRef<Set<string>>(new Set());
+  const previousWishlistIds = useRef<Set<string>>(new Set());
 
   // 1. Initial load from local IndexedDB on page load/refresh
   useEffect(() => {
@@ -36,6 +39,7 @@ export default function StoreHydrator() {
     getStoredItem<any[]>("wishlist").then((savedWishlist) => {
       if (savedWishlist && Array.isArray(savedWishlist) && savedWishlist.length > 0) {
         dispatch(setWishlistItems(savedWishlist));
+        previousWishlistIds.current = new Set(savedWishlist.map((i) => String(i.id)));
       }
       isWishlistHydrated.current = true;
     });
@@ -89,6 +93,7 @@ export default function StoreHydrator() {
       await setStoredItem("wishlist", mergedWishlist);
 
       previousCartIds.current = new Set(mergedCart.map((i) => String(i.id)));
+      previousWishlistIds.current = new Set(mergedWishlist.map((i) => String(i.id)));
     } catch (err) {
       console.warn("Cloud sync warning:", err);
     }
@@ -121,11 +126,32 @@ export default function StoreHydrator() {
     }
   }, [cartItems, currentUserId]);
 
-  // 4. Persist local wishlist changes to IndexedDB
+  // 4. Persist local wishlist changes to IndexedDB and Supabase
   useEffect(() => {
     if (!isWishlistHydrated.current) return;
+
+    // Persist to local IndexedDB
     setStoredItem("wishlist", wishlistItems);
-  }, [wishlistItems]);
+
+    // If authenticated, persist to Supabase
+    if (currentUserId) {
+      const currentIds = new Set(wishlistItems.map((i) => String(i.id)));
+
+      // Detect removed items
+      previousWishlistIds.current.forEach((oldId) => {
+        if (!currentIds.has(oldId)) {
+          removeWishlistItemFromDatabase(currentUserId, oldId);
+        }
+      });
+
+      // Update or insert current items
+      wishlistItems.forEach((item) => {
+        persistWishlistItemToDatabase(currentUserId, item);
+      });
+
+      previousWishlistIds.current = currentIds;
+    }
+  }, [wishlistItems, currentUserId]);
 
   return null;
 }

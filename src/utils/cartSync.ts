@@ -223,3 +223,46 @@ export async function removeCartItemFromDatabase(
     console.error("Failed to remove cart item from database:", err);
   }
 }
+
+/**
+ * Save an individual wishlist item directly to Supabase
+ */
+export async function persistWishlistItemToDatabase(
+  userId: string,
+  item: SyncWishlistItem
+) {
+  try {
+    const supabase = createClient();
+    await supabase.from("wishlist_items").upsert({
+      user_id: userId,
+      product_id: String(item.id),
+      title: item.title,
+      price: item.price,
+      image: item.img || item.image || null,
+    }, {
+      onConflict: "user_id,product_id",
+    });
+  } catch (err) {
+    console.error("Failed to persist wishlist item to database:", err);
+  }
+}
+
+/**
+ * Delete a wishlist item from Supabase
+ */
+export async function removeWishlistItemFromDatabase(
+  userId: string,
+  productId: string | number
+) {
+  try {
+    const supabase = createClient();
+    await supabase
+      .from("wishlist_items")
+      .delete()
+      .eq("user_id", userId)
+      .eq("product_id", String(productId));
+  } catch (err) {
+    console.error("Failed to remove wishlist item from database:", err);
+  }
+}
+

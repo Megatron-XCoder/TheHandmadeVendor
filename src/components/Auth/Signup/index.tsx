@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -26,10 +26,13 @@ const Signup = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showRePassword, setShowRePassword] = useState(false);
-  const [passwordError, setPasswordError] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const isMatching = formData.rePassword
+    ? formData.password === formData.rePassword
+    : null;
 
   // 5-minute countdown timer effect
   useEffect(() => {
@@ -65,9 +68,6 @@ const Signup = () => {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    if (name === "password" || name === "rePassword") {
-      setPasswordError("");
-    }
   };
 
   const handleSendCode = async () => {
@@ -79,12 +79,12 @@ const Signup = () => {
       showToast.error("Please enter your email address.");
       return;
     }
-    if (formData.password !== formData.rePassword) {
-      setPasswordError("Passwords do not match");
+    if (formData.password.length < 8) {
+      showToast.error("Password must be at least 8 characters long.");
       return;
     }
-    if (formData.password.length < 8) {
-      setPasswordError("Password must be at least 8 characters long.");
+    if (formData.password !== formData.rePassword) {
+      showToast.error("Passwords do not match. Please verify both fields.");
       return;
     }
     if (!formData.agreeTerms) {
@@ -479,12 +479,29 @@ const Signup = () => {
                             </svg>
                           </button>
                         </div>
+
+                        {/* Real-time Password Match Indicator */}
+                        {formData.rePassword ? (
+                          <div className="mt-2 flex items-center gap-1.5 text-xs animate-in fade-in duration-200">
+                            {isMatching ? (
+                              <>
+                                <span className="w-4 h-4 rounded-full bg-[#EBF5EC] text-[#4E8752] flex items-center justify-center text-[10px] font-bold">
+                                  ✓
+                                </span>
+                                <span className="text-[#4E8752] font-medium">Passwords match</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-4 h-4 rounded-full bg-[#FEF2F2] text-red-500 flex items-center justify-center text-[10px] font-bold">
+                                  ✕
+                                </span>
+                                <span className="text-red-500 font-medium">Passwords do not match yet</span>
+                              </>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
-
-                    {passwordError && (
-                      <p className="text-xs text-red-500 font-medium">{passwordError}</p>
-                    )}
 
                     {/* Agree Terms */}
                     <div className="flex items-start gap-2.5 pt-1">

@@ -431,75 +431,77 @@ const Header = () => {
                 )}
               </div>
 
-              {/* Profile / Account */}
-              {currentUser ? (
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    aria-label="User account"
-                    className="relative"
-                  >
-                    <IconBtn label="My Account" active={userMenuOpen}>
+              {/* Profile / Account (Desktop only - on mobile view it lives inside the sidebar) */}
+              <div className="hidden lg:block">
+                {currentUser ? (
+                  <div className="relative" ref={userMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      aria-label="User account"
+                      className="relative"
+                    >
+                      <IconBtn label="My Account" active={userMenuOpen}>
+                        <UserIcon />
+                      </IconBtn>
+                      <span
+                        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none"
+                        style={{ background: "#C4896A" }}
+                      />
+                    </button>
+
+                    {userMenuOpen && (
+                      <div
+                        className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border p-3 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                        style={{ borderColor: "#E3C9A8" }}
+                      >
+                        <div className="px-3 py-2 border-b border-[#E3C9A8]/40 mb-2">
+                          <span
+                            className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#C4896A] block"
+                            style={{ fontFamily: "'Cinzel', serif" }}
+                          >
+                            Atelier Member
+                          </span>
+                          <p className="text-xs font-medium text-[#3D2B1F] truncate mt-0.5">
+                            {currentUser.user_metadata?.first_name
+                              ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name || ""}`.trim()
+                              : currentUser.email}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          <Link
+                            href="/my-account"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#3D2B1F] hover:bg-[#FEF5EC] transition-colors"
+                          >
+                            <span>My Account</span>
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const supabase = createClient();
+                              await supabase.auth.signOut();
+                              setUserMenuOpen(false);
+                              window.location.href = "/";
+                            }}
+                            className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl text-red-400 hover:bg-[#FEF5EC] transition-colors"
+                          >
+                            <span>Sign Out</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Link href="/signin" aria-label="Sign in">
+                    <IconBtn label="Sign in" active={pathUrl === "/signin" || pathUrl === "/profile"}>
                       <UserIcon />
                     </IconBtn>
-                    <span
-                      className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none"
-                      style={{ background: "#C4896A" }}
-                    />
-                  </button>
-
-                  {userMenuOpen && (
-                    <div
-                      className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border p-3 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200"
-                      style={{ borderColor: "#E3C9A8" }}
-                    >
-                      <div className="px-3 py-2 border-b border-[#E3C9A8]/40 mb-2">
-                        <span
-                          className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#C4896A] block"
-                          style={{ fontFamily: "'Cinzel', serif" }}
-                        >
-                          Atelier Member
-                        </span>
-                        <p className="text-xs font-medium text-[#3D2B1F] truncate mt-0.5">
-                          {currentUser.user_metadata?.first_name
-                            ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name || ""}`.trim()
-                            : currentUser.email}
-                        </p>
-                      </div>
-
-                      <div className="space-y-1 text-xs">
-                        <Link
-                          href="/my-account"
-                          onClick={() => setUserMenuOpen(false)}
-                          className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#3D2B1F] hover:bg-[#FEF5EC] transition-colors"
-                        >
-                          <span>Orders & Privileges</span>
-                        </Link>
-
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const supabase = createClient();
-                            await supabase.auth.signOut();
-                            setUserMenuOpen(false);
-                            window.location.href = "/";
-                          }}
-                          className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
-                        >
-                          <span>Sign Out</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <Link href="/signin" aria-label="Sign in">
-                  <IconBtn label="Sign in" active={pathUrl === "/signin" || pathUrl === "/profile"}>
-                    <UserIcon />
-                  </IconBtn>
-                </Link>
-              )}
+                  </Link>
+                )}
+              </div>
 
               {/* Wishlist */}
               <div className="relative">
@@ -646,37 +648,82 @@ const Header = () => {
           </div>
         </div>
 
-        {/* Sidebar footer */}
+        {/* Sidebar Member / Profile section */}
         <div
-          className="flex items-center gap-5 px-5 py-4"
+          className="px-5 py-4 space-y-3"
           style={{ borderTop: "1px solid #E3C9A8" }}
         >
-          <Link
-            href="/signin"
-            onClick={() => setSidebarOpen(false)}
-            className={`flex items-center gap-2 text-sm font-medium transition-colors duration-200 ${pathUrl === "/signin" || pathUrl === "/profile" ? "text-[#C4896A]" : "text-gray-600 hover:text-[#C4896A]"}`}
-          >
-            <UserIcon />
-            <span>Sign In</span>
-          </Link>
-          <button
-            onClick={() => {
-              setSidebarOpen(false);
-              openWishlistModal();
-            }}
-            className="flex items-center gap-2 text-sm font-medium transition-colors duration-200 text-gray-600 hover:text-[#C4896A]"
-          >
-            <HeartIcon />
-            <span>Wishlist</span>
-            {wishlistItems.length > 0 && (
-              <span
-                className="text-[10px] font-bold text-white rounded-full px-1.5 py-0.5 leading-none"
-                style={{ background: "#C4896A" }}
+          {currentUser ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-[#FEF5EC] border border-[#E3C9A8]/60">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
+                  style={{ background: "#C4896A" }}
+                >
+                  {(currentUser.user_metadata?.first_name?.[0] || currentUser.email?.[0] || "U").toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span
+                    className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#C4896A] block"
+                    style={{ fontFamily: "'Cinzel', serif" }}
+                  >
+                    Atelier Member
+                  </span>
+                  <p className="text-sm font-semibold text-[#3D2B1F] truncate">
+                    {currentUser.user_metadata?.first_name
+                      ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name || ""}`.trim()
+                      : currentUser.email}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/my-account"
+                  onClick={() => setSidebarOpen(false)}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#D49777] text-white hover:bg-[#D49777] transition-colors text-sm font-medium"
+                >
+                  <UserIcon />
+                  <span>My Account</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const supabase = createClient();
+                    await supabase.auth.signOut();
+                    setSidebarOpen(false);
+                    window.location.href = "/";
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-[#D49777] text-red-600 bg-red-50/50 hover:bg-red-100 transition-colors text-sm font-medium"
+                >
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              <Link
+                href="/signin"
+                onClick={() => setSidebarOpen(false)}
+                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 border border-[#E3C9A8] ${
+                  pathUrl === "/signin" || pathUrl === "/profile"
+                    ? "bg-[#3D2B1F] text-white shadow-sm"
+                    : "bg-white text-[#3D2B1F] hover:bg-[#FEF5EC]"
+                }`}
               >
-                {wishlistItems.length}
-              </span>
-            )}
-          </button>
+                <UserIcon />
+                <span>Sign In</span>
+              </Link>
+              <Link
+                href="/signup"
+                onClick={() => setSidebarOpen(false)}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 bg-[#D49777] text-white hover:bg-[#D49777] shadow-sm"
+              >
+                <span>Register</span>
+              </Link>
+            </div>
+          )}
         </div>
       </aside>
     </>

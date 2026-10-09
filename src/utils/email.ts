@@ -105,3 +105,125 @@ export async function sendVerificationEmail({
   await transporter.sendMail(mailOptions);
   return { success: true, simulated: false };
 }
+
+interface SendWelcomeEmailOptions {
+  email: string;
+  firstName?: string;
+}
+
+export async function sendWelcomeEmail({
+  email,
+  firstName,
+}: SendWelcomeEmailOptions) {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const from =
+    process.env.SMTP_FROM ||
+    `"The Handmade Vendor Concierge" <concierge@thehandmadevendor.com>`;
+
+  const displayName = firstName?.trim() || "Valued Client";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Welcome to The Handmade Vendor Atelier</title>
+      <style>
+        body { margin: 0; padding: 0; background-color: #FFFAF5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #3D2B1F; }
+        .wrapper { max-width: 620px; margin: 30px auto; background-color: #FFFFFF; border: 1px solid #E3C9A8; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 36px rgba(61,43,31,0.08); }
+        .header { background: linear-gradient(155deg, #1F150E 0%, #35241A 50%, #4A3324 100%); padding: 42px 32px; text-align: center; color: #FFFFFF; }
+        .brand-title { font-size: 22px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #FFFFFF; margin: 0; }
+        .brand-subtitle { font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; color: #C4896A; margin-top: 8px; }
+        .content { padding: 42px 36px; text-align: left; }
+        .salutation { font-size: 20px; font-weight: 600; color: #3D2B1F; margin-bottom: 14px; }
+        .text { font-size: 14px; line-height: 1.7; color: #5C4B3E; margin-bottom: 24px; }
+        .privilege-card { background: #FFFAF5; border: 1px solid #E3C9A8; border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; }
+        .privilege-title { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #C4896A; margin-bottom: 12px; }
+        .privilege-item { font-size: 13px; line-height: 1.6; color: #4A382C; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 8px; }
+        .btn-container { text-align: center; margin: 32px 0 20px 0; }
+        .btn { display: inline-block; background: #3D2B1F; color: #FFFFFF !important; font-size: 13px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; text-decoration: none; padding: 14px 34px; border-radius: 8px; border: 1px solid #C4896A; }
+        .footer { background: #FFFAF5; border-top: 1px solid #E3C9A8; padding: 26px 32px; text-align: center; font-size: 11px; color: #A09082; letter-spacing: 0.08em; text-transform: uppercase; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="header">
+          <h1 class="brand-title">The Handmade Vendor</h1>
+          <p class="brand-subtitle">Atelier Concierge • Private Client Services</p>
+        </div>
+        <div class="content">
+          <div class="salutation">Welcome, ${displayName}</div>
+          <p class="text">
+            Your membership account has been verified and activated with distinction. 
+            We are honored to welcome you into our community of connoisseurs and patrons 
+            of handcrafted luxury.
+          </p>
+
+          <div class="privilege-card">
+            <div class="privilege-title">Your Atelier Privileges</div>
+            <div class="privilege-item">
+              <span>⚜️ </span>
+              <div><strong>Bespoke Commissions:</strong> Direct inquiry access for custom dimensions, materials, and artisan consultations.</div>
+            </div>
+            <div class="privilege-item">
+              <span>⚜️ </span>
+              <div><strong>Cross-Device Curation:</strong> Your shopping bag and bespoke wishlists synchronize seamlessly across all your devices.</div>
+            </div>
+            <div class="privilege-item">
+              <span>⚜️ </span>
+              <div><strong>Atelier Creation Tracker:</strong> Follow every stage of your order from artisan crafting in Florence to white-glove dispatch.</div>
+            </div>
+          </div>
+
+          <div class="btn-container">
+            <a href="${siteUrl}" class="btn" target="_blank">Explore The Collection</a>
+          </div>
+
+          <p class="text" style="font-size: 12px; margin-bottom: 0; color: #8A7A6D;">
+            Should you require assistance or wish to discuss a bespoke piece, our Atelier Concierge is at your service at 
+            <a href="mailto:concierge@thehandmadevendor.com" style="color: #C4896A;">concierge@thehandmadevendor.com</a>.
+          </p>
+        </div>
+        <div class="footer">
+          Artisan Mastery • Since 2018 • Florence, Italy
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (!user || !pass) {
+    console.log(`\n========================================================`);
+    console.log(`[THE HANDMADE VENDOR] Welcome Email Generated:`);
+    console.log(`Recipient: ${email} (${displayName})`);
+    console.log(`Subject: Welcome to The Handmade Vendor Atelier, ${displayName} ⚜️`);
+    console.log(`========================================================\n`);
+    return { success: true, simulated: true };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+
+  const mailOptions = {
+    from,
+    to: email,
+    subject: `Welcome to The Handmade Vendor Atelier, ${displayName} ⚜️`,
+    html: htmlContent,
+    text: `Welcome to The Handmade Vendor Atelier, ${displayName}. Your account has been verified and activated. Visit ${siteUrl} to explore our collection.`,
+  };
+
+  await transporter.sendMail(mailOptions);
+  return { success: true, simulated: false };
+}
+
