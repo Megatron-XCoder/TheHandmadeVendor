@@ -83,7 +83,7 @@ const Hero = () => {
 
                     <div className="flex flex-wrap gap-4">
                       <Link
-                        href="/shop-with-sidebar"
+                        href="/shop"
                         className="inline-flex items-center gap-2 font-medium text-sm text-white px-8 py-3.5 rounded-full transition-all duration-300 hover:shadow-lg"
                         style={{ background: "#C4896A" }}
                         onMouseEnter={(e: any) => (e.currentTarget.style.background = "#B37A5E")}
@@ -95,7 +95,7 @@ const Hero = () => {
                         </svg>
                       </Link>
                       <Link
-                        href="/shop-without-sidebar"
+                        href="/shop"
                         className="inline-flex items-center font-medium text-sm px-8 py-3.5 rounded-full transition-all duration-300"
                         style={{ color: "#C4896A", border: "1.5px solid #C4896A", background: "rgba(255,250,245,0.8)" }}
                         onMouseEnter={(e: any) => {
@@ -147,7 +147,7 @@ const Hero = () => {
                   Scarves, jewelry & more — handpicked to complement your style.
                 </p>
                 <Link
-                  href="/shop-with-sidebar"
+                  href="/shop"
                   className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-200"
                   style={{ color: "#C4896A" }}
                 >
@@ -185,7 +185,7 @@ const Hero = () => {
                   Elegant handcrafted clutches for your special occasions.
                 </p>
                 <Link
-                  href="/shop-with-sidebar"
+                  href="/shop"
                   className="inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-200"
                   style={{ color: "#C4896A" }}
                 >

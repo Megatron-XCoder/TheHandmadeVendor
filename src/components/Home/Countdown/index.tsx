@@ -74,7 +74,7 @@ const CounDown = () => {
             </div>
 
             <Link
-              href="/shop-with-sidebar"
+              href="/shop"
               className="inline-flex items-center gap-2 font-medium text-sm text-white px-8 py-3.5 rounded-full transition-all duration-300 shadow-sm"
               style={{ background: "#3D2B1F" }}
               onMouseEnter={(e: any) => (e.currentTarget.style.background = "#2A1D15")}

@@ -60,7 +60,29 @@ export default function RootLayout({
                           zIndex: 9999999,
                         }}
                         toastOptions={{
-                          duration: 3000,
+                          duration: 3500,
+                          style: {
+                            background: "#FFFAF5",
+                            color: "#3D2B1F",
+                            border: "1px solid #E3C9A8",
+                            borderRadius: "16px",
+                            boxShadow: "0 12px 36px rgba(61,43,31,0.14)",
+                            padding: "10px 14px",
+                            fontSize: "13px",
+                            fontWeight: 500,
+                          },
+                          success: {
+                            iconTheme: {
+                              primary: "#C4896A",
+                              secondary: "#FEF5EC",
+                            },
+                          },
+                          error: {
+                            iconTheme: {
+                              primary: "#C4896A",
+                              secondary: "#FEF5EC",
+                            },
+                          },
                         }}
                       />
                     </PreviewSliderProvider>

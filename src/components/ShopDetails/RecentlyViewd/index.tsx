@@ -1,100 +1,74 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import shopData from "@/components/Shop/shopData";
 import ProductItem from "@/components/Common/ProductItem";
-import Image from "next/image";
 import Link from "next/link";
 
-import { Swiper, SwiperSlide } from "swiper/react";
-import { useCallback, useRef } from "react";
-import "swiper/css/navigation";
-import "swiper/css";
+interface RecentlyViewdItemsProps {
+  currentProductId?: number;
+}
 
-const RecentlyViewdItems = () => {
-  const sliderRef = useRef(null);
-
-  const handlePrev = useCallback(() => {
-    if (!sliderRef.current) return;
-    sliderRef.current.swiper.slidePrev();
-  }, []);
-
-  const handleNext = useCallback(() => {
-    if (!sliderRef.current) return;
-    sliderRef.current.swiper.slideNext();
-  }, []);
+const RecentlyViewdItems: React.FC<RecentlyViewdItemsProps> = ({ currentProductId }) => {
+  // Select top 4 complementary items, excluding the active product
+  const recommendedItems = useMemo(() => {
+    const filtered = shopData.filter((item) => item.id !== currentProductId);
+    return filtered.slice(0, 4);
+  }, [currentProductId]);
 
   return (
-    <section className="overflow-hidden pt-17.5">
-      <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0 pb-15 border-b border-gray-3">
-        <div className="swiper categories-carousel common-carousel">
-          {/* <!-- section title --> */}
-          <div className="mb-10 flex items-center justify-between">
-            <div>
-              <span className="flex items-center gap-2.5 font-medium text-dark mb-1.5">
-                <Image
-                  src="/images/icons/icon-05.svg"
-                  width={17}
-                  height={17}
-                  alt="icon"
-                />
-                Categories
-              </span>
-              <h2 className="font-semibold text-xl xl:text-heading-5 text-dark">
-                Browse by Category
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={handlePrev} className="swiper-button-prev">
-                <svg
-                  className="fill-current"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M15.4881 4.43057C15.8026 4.70014 15.839 5.17361 15.5694 5.48811L9.98781 12L15.5694 18.5119C15.839 18.8264 15.8026 19.2999 15.4881 19.5695C15.1736 19.839 14.7001 19.8026 14.4306 19.4881L8.43056 12.4881C8.18981 12.2072 8.18981 11.7928 8.43056 11.5119L14.4306 4.51192C14.7001 4.19743 15.1736 4.161 15.4881 4.43057Z"
-                    fill=""
-                  />
-                </svg>
-              </button>
-
-              <button onClick={handleNext} className="swiper-button-next">
-                <svg
-                  className="fill-current"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                    d="M8.51192 4.43057C8.82641 4.161 9.29989 4.19743 9.56946 4.51192L15.5695 11.5119C15.8102 11.7928 15.8102 12.2072 15.5695 12.4881L9.56946 19.4881C9.29989 19.8026 8.82641 19.839 8.51192 19.5695C8.19743 19.2999 8.161 18.8264 8.43057 18.5119L14.0122 12L8.43057 5.48811C8.161 5.17361 8.19743 4.70014 8.51192 4.43057Z"
-                    fill=""
-                  />
-                </svg>
-              </button>
-            </div>
+    <section className="py-16 sm:py-24 bg-[#FFFAF5] border-t border-[#E3C9A8]/40">
+      <div className="max-w-[1240px] w-full mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 pb-6 border-b border-[#E3C9A8]/30">
+          <div>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.25em] text-[#C4896A] mb-2 block">
+              Curated Atelier Selection
+            </span>
+            <h2
+              className="text-2xl sm:text-3xl lg:text-4xl font-normal text-[#2A1E17] tracking-tight"
+              style={{ fontFamily: "'Cinzel', serif" }}
+            >
+              You May Also Cherish
+            </h2>
+            <p className="text-xs sm:text-sm text-[#7D6E63] mt-1.5 font-light">
+              Artisanal creations crafted to harmonize with your selected piece.
+            </p>
           </div>
 
-          <Swiper
-            ref={sliderRef}
-            slidesPerView={4}
-            spaceBetween={20}
-            className="justify-between"
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-2 self-start sm:self-auto text-xs font-semibold uppercase tracking-[0.15em] text-[#3D2B1F] hover:text-[#C4896A] transition-colors group cursor-pointer"
           >
-            {shopData.map((item, key) => (
-              <SwiperSlide key={key}>
-                <ProductItem item={item} />
-              </SwiperSlide>
-            ))}
-          </Swiper>
+            <span>View All Creations</span>
+            <svg
+              className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform duration-200"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </div>
+
+        {/* 4 Cards on Desktop, 2 Cards on Mobile */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          {recommendedItems.map((item, key) => (
+            <div key={item.id || key} className="h-full">
+              <ProductItem item={item} />
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom Explore Button */}
+        <div className="text-center mt-12 sm:mt-14">
+          <Link
+            href="/shop"
+            className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#FAF6F0] bg-[#3D2B1F] hover:bg-[#C4896A] px-8 py-3.5 rounded-full transition-all duration-300 shadow-sm active:scale-95 cursor-pointer"
+          >
+            <span>Explore Entire Collection</span>
+          </Link>
         </div>
       </div>
     </section>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import toast from "react-hot-toast";
+import { showToast } from "@/utils/toast";
 
 const EditOrder = ({ order, toggleModal }: any) => {
   const [currentStatus, setCurrentStatus] = useState(order?.status);
@@ -11,7 +11,7 @@ const EditOrder = ({ order, toggleModal }: any) => {
     e.preventDefault();
 
     if (!currentStatus) {
-      toast.error("Please select a status");
+      showToast.error("Please select a status");
       return;
     }
 

@@ -45,6 +45,11 @@
     - [Guest vs. Authenticated Persistence Behavior](#guest-vs-authenticated-persistence-behavior)
 12. [Signup Password Validation UX](#12-signup-password-validation-ux)
     - [Simplified Real-Time Match Indicator](#simplified-real-time-match-indicator-srccomponentsauthsignupindextsx)
+13. [Luxury Artisanal Collection Shop Page (`/shop-with-sidebar`)](#13-luxury-artisanal-collection-shop-page-shop-with-sidebar)
+    - [Sticky Floating Filter & Sort Pill with Footer Observer](#sticky-floating-filter--sort-pill-with-footer-observer)
+    - [Collapsible Slide-Over Drawer & Expandable Desktop Sidebar](#collapsible-slide-over-drawer--expandable-desktop-sidebar)
+    - [Product Card Luxury Architecture & Quick Actions](#product-card-luxury-architecture--quick-actions)
+    - [Deprecation of `/shop-without-sidebar`](#deprecation-of-shop-without-sidebar)
 
 ---
 
@@ -651,6 +656,48 @@ The platform implements an optimistic, non-blocking synchronization pipeline con
   - **Match State**: `✓ Passwords match` in artisan sage green (`#4E8752`) with a circular checkmark badge.
   - **Mismatch State**: `✕ Passwords do not match yet` in soft warning red (`#EF4444`) with a circular cross badge while typing.
   - Only displays once the user begins entering characters into the Re-Password field.
+
+---
+
+## 13. Luxury Artisanal Collection Shop Page (`/shop-with-sidebar`)
+
+### Sticky Floating Filter & Sort Pill with Footer Observer
+- **Design & Layout**:
+  - Rendered as a dark luxury pill button (`fixed bottom-6 left-1/2 -translate-x-1/2 z-40`) featuring `#1F150E` background, bronze border `border-[#C4896A]`, sliders SVG icon, and text `Filter & Sort by` (with active filter badge if > 0).
+- **Footer Intersection Observer**:
+  - Automatically observes `#main-footer` using `IntersectionObserver(..., { threshold: 0.05 })`.
+  - While scrolling down, as soon as the footer begins entering the viewport, the button smoothly fades and slides out: `opacity-0 translate-y-8 pointer-events-none`.
+  - When scrolling back up away from the footer, it immediately restores: `opacity-100 translate-y-0 pointer-events-auto`.
+
+### Slide-Over Drawer & Full-Width Gallery Architecture
+- **Unobstructed Gallery**: The bulky top control box and onscreen static sidebar have been removed to give full focus to the handcrafted goods.
+- **Slide-Over Drawer**:
+  - Accessible via the sticky floating pill button at the bottom of the screen (`Filter & Sort by`).
+  - Features smooth backdrop blur (`bg-[#1F150E]/60 backdrop-blur-sm z-[99999]`), luxury ivory container (`#FFFAF5`), and full filtering/sorting controls:
+    - **Sort Orders**: Featured Heirlooms, Newest, Price: Low to High, Price: High to Low, Rating.
+    - **Collections**: Leather Goods, Fine Jewelry & Rings, Horology & Timepieces, Ceramics & Stoneware, Heritage Textiles, Bespoke Metalwork (with dynamic count badges).
+    - **Price Presets & Custom Inputs**: Quick presets ($0–$150, $150–$250, $250–$350, $350+) alongside manual min/max range fields.
+    - **Craft Materials**: Full-Grain Leather, 18k Solid Gold, Solid Brass, Damascus Steel, Italian Carrera Marble, etc.
+    - **Atelier Status**: "Ready to Ship" and **"Preorder Products"** (reserving upcoming batch creations).
+    - **Actions**: "Reset All" and "Show X Heirlooms".
+
+### Uniform Product Cards & Responsive Grid
+- **Homepage Card Parity**: The collection uses `@/components/Common/ProductItem`, the exact same product card component as the homepage (`BestSeller` and `NewArrivals`), ensuring 100% visual and interactive consistency across the entire storefront:
+  - Swiper image preview slider.
+  - Hover action overlays (Quick View, Add to Bag, Wishlist toggle).
+  - Star ratings, `'Cinzel', serif` headings, and luxury pricing.
+- **Responsive Layout**:
+  - **Desktop View**: Exactly **4 cards per row** (`xl:grid-cols-4`).
+  - **Mobile View**: Exactly **2 cards per row** (`grid-cols-2`).
+- **Functional Pagination**:
+  - Interactive page number buttons with previous/next controls.
+  - Automatically resets to Page 1 when any filter changes.
+  - Smoothly scrolls to the top of the collection grid on page change.
+
+### Deprecation of `/shop-without-sidebar`
+- `/shop-without-sidebar/page.tsx` was converted into a clean Next.js server redirect to `/shop-with-sidebar`.
+- Unused legacy components in `src/components/ShopWithoutSidebar` and redundant dropdown files were deleted.
+- All internal navigation links (`menuData.ts`, `Hero`, `BestSeller`) updated directly to `/shop-with-sidebar`.
 
 ---
 

@@ -30,7 +30,7 @@ const NewArrival = () => {
           </div>
 
           <Link
-            href="/shop-with-sidebar"
+            href="/shop"
             className="inline-flex items-center gap-1.5 font-medium text-sm py-2.5 px-7 rounded-full transition-all duration-300"
             style={{ color: "#C4896A", border: "1px solid #E3C9A8", background: "#fff" }}
             onMouseEnter={(e: any) => {

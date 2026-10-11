@@ -48,7 +48,7 @@ const EmptyCart = () => {
 
       <Link
         onClick={() => closeCartModal()}
-        href="/shop-with-sidebar"
+        href="/shop"
         className="inline-flex items-center justify-center px-7 py-3 rounded-full text-xs sm:text-sm font-semibold tracking-[0.15em] uppercase text-white transition-all duration-300 shadow-md hover:shadow-lg"
         style={{
           background: "#3D2B1F",

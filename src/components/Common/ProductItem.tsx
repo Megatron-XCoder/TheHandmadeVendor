@@ -150,7 +150,7 @@ const ProductItem = ({ item, badge }: { item: Product; badge?: string }) => {
           style={{ color: "#3D2B1F", fontFamily: "'Cinzel', serif" }}
           onClick={() => handleProductDetails()}
         >
-          <Link href="/shop-details" className="hover:text-[#C4896A]">
+          <Link href={`/shop-details?id=${item.id}`} className="hover:text-[#C4896A]">
             {item.title}
           </Link>
         </h3>

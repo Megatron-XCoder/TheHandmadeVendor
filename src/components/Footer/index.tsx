@@ -6,7 +6,7 @@ const Footer = () => {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative overflow-hidden bg-white">
+    <footer id="main-footer" className="relative overflow-hidden bg-white">
       {/* Decorative Top Border */}
       <div className="h-1 w-full" style={{ background: "linear-gradient(90deg, #E3C9A8 0%, #C4896A 50%, #E3C9A8 100%)" }}></div>
 
@@ -45,11 +45,11 @@ const Footer = () => {
           <div>
             <h3 className="text-sm font-semibold tracking-widest uppercase mb-8" style={{ color: "#3D2B1F" }}>Collections</h3>
             <ul className="flex flex-col gap-4 text-sm" style={{ color: "#7A6B5D" }}>
-              <li><Link href="/shop-with-sidebar" className="transition-colors hover:text-[#C4896A]">Signature Totes</Link></li>
-              <li><Link href="/shop-with-sidebar" className="transition-colors hover:text-[#C4896A]">Evening Clutches</Link></li>
-              <li><Link href="/shop-with-sidebar" className="transition-colors hover:text-[#C4896A]">Classic Wallets</Link></li>
-              <li><Link href="/shop-with-sidebar" className="transition-colors hover:text-[#C4896A]">Travel Essentials</Link></li>
-              <li><Link href="/shop-with-sidebar" className="transition-colors hover:text-[#C4896A]">Leather Accessories</Link></li>
+              <li><Link href="/shop" className="transition-colors hover:text-[#C4896A]">Signature Totes</Link></li>
+              <li><Link href="/shop" className="transition-colors hover:text-[#C4896A]">Evening Clutches</Link></li>
+              <li><Link href="/shop" className="transition-colors hover:text-[#C4896A]">Classic Wallets</Link></li>
+              <li><Link href="/shop" className="transition-colors hover:text-[#C4896A]">Travel Essentials</Link></li>
+              <li><Link href="/shop" className="transition-colors hover:text-[#C4896A]">Leather Accessories</Link></li>
             </ul>
           </div>
 

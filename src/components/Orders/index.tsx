@@ -99,7 +99,7 @@ export default function Orders() {
             Your private order archive is currently empty. Explore our signature leather collections and jewelry to place your first bespoke acquisition.
           </p>
           <Link
-            href="/shop-with-sidebar"
+            href="/shop"
             className="inline-flex py-3 px-8 rounded-full text-xs font-semibold tracking-[0.15em] uppercase text-white transition-all duration-300 shadow-md hover:shadow-xl"
             style={{ background: "#3D2B1F", fontFamily: "'Cinzel', serif" }}
           >

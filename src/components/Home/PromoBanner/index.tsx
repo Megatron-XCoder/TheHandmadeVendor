@@ -40,7 +40,7 @@ const PromoBanner = () => {
 
             <div className="flex">
               <Link
-                href="/shop-with-sidebar"
+                href="/shop"
                 className="inline-flex items-center justify-center font-medium text-sm px-8 py-3.5 rounded-full transition-all duration-300 shadow-xl"
                 style={{ background: "#C4896A", color: "#fff" }}
                 onMouseEnter={(e: any) => (e.currentTarget.style.background = "#B37A5E")}
@@ -73,7 +73,7 @@ const PromoBanner = () => {
                   Classic Wallets
                 </h2>
                 <Link
-                  href="/shop-with-sidebar"
+                  href="/shop"
                   className="inline-flex items-center font-bold text-sm transition-colors duration-200"
                   style={{ color: "#E3C9A8", textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}
                   onMouseEnter={(e: any) => (e.currentTarget.style.color = "#fff")}
@@ -105,7 +105,7 @@ const PromoBanner = () => {
                   Dusty Rose Clutch
                 </h2>
                 <Link
-                  href="/shop-with-sidebar"
+                  href="/shop"
                   className="inline-flex items-center font-bold text-sm transition-colors duration-200"
                   style={{ color: "#E3C9A8", textShadow: "0 2px 4px rgba(0,0,0,0.8)" }}
                   onMouseEnter={(e: any) => (e.currentTarget.style.color = "#fff")}

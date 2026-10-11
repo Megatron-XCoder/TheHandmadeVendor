@@ -39,7 +39,7 @@ const BestSeller = () => {
 
         <div className="text-center mt-12.5">
           <Link
-            href="/shop-without-sidebar"
+            href="/shop"
             className="inline-flex items-center gap-2 font-medium text-sm text-white px-8 py-3.5 rounded-full transition-all duration-300 shadow-sm"
             style={{ background: "#C4896A" }}
             onMouseEnter={(e: any) => (e.currentTarget.style.background = "#B37A5E")}
