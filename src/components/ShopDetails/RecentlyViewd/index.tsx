@@ -60,16 +60,6 @@ const RecentlyViewdItems: React.FC<RecentlyViewdItemsProps> = ({ currentProductI
             </div>
           ))}
         </div>
-
-        {/* Bottom Explore Button */}
-        <div className="text-center mt-12 sm:mt-14">
-          <Link
-            href="/shop"
-            className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#FAF6F0] bg-[#3D2B1F] hover:bg-[#C4896A] px-8 py-3.5 rounded-full transition-all duration-300 shadow-sm active:scale-95 cursor-pointer"
-          >
-            <span>Explore Entire Collection</span>
-          </Link>
-        </div>
       </div>
     </section>
   );

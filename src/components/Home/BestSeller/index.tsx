@@ -1,16 +1,23 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import ProductItem from "@/components/Common/ProductItem";
-import Image from "next/image";
 import Link from "next/link";
 import shopData from "@/components/Shop/shopData";
+import { Product } from "@/types/product";
+
+// Function to retrieve best seller products up to the specified limit
+const getBestSellers = (limit: number = 8): Product[] => {
+  return shopData.slice(1, 1 + limit);
+};
 
 const BestSeller = () => {
+  const bestSellers = useMemo(() => getBestSellers(8), []);
+
   return (
     <section className="overflow-hidden py-16 lg:py-20" style={{ background: "#FFFAF5" }}>
       <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
         {/* Section title */}
-        <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="mb-10 flex flex-row items-center justify-between gap-4">
           <div>
             <span
               className="flex items-center gap-2.5 font-medium mb-1.5 text-sm"
@@ -28,25 +35,31 @@ const BestSeller = () => {
               Best Sellers
             </h2>
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-          {/* Best Sellers item */}
-          {shopData.slice(1, 9).map((item, key) => (
-            <ProductItem item={item} key={key} badge="Best Seller" />
-          ))}
-        </div>
-
-        <div className="text-center mt-12.5">
           <Link
             href="/shop"
-            className="inline-flex items-center gap-2 font-medium text-sm text-white px-8 py-3.5 rounded-full transition-all duration-300 shadow-sm"
-            style={{ background: "#C4896A" }}
-            onMouseEnter={(e: any) => (e.currentTarget.style.background = "#B37A5E")}
-            onMouseLeave={(e: any) => (e.currentTarget.style.background = "#C4896A")}
+            className="inline-flex items-center gap-1.5 font-medium text-sm py-2.5 px-7 rounded-full transition-all duration-300 shadow-sm"
+            style={{ color: "#C4896A", border: "1px solid #E3C9A8", background: "#fff" }}
+            onMouseEnter={(e: any) => {
+              e.currentTarget.style.background = "#C4896A";
+              e.currentTarget.style.color = "#fff";
+              e.currentTarget.style.borderColor = "#C4896A";
+            }}
+            onMouseLeave={(e: any) => {
+              e.currentTarget.style.background = "#fff";
+              e.currentTarget.style.color = "#C4896A";
+              e.currentTarget.style.borderColor = "#E3C9A8";
+            }}
           >
-            View All Products
+            View All
           </Link>
+        </div>
+
+        {/* Best Sellers Grid (8 cards) */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+          {bestSellers.map((item, key) => (
+            <ProductItem item={item} key={item.id || key} badge="Best Seller" />
+          ))}
         </div>
       </div>
     </section>

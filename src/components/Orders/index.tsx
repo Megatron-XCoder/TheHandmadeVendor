@@ -44,6 +44,9 @@ const stages = [
   { key: "Delivered", title: "Delivered", desc: "Received at private destination" },
 ];
 
+import AtelierTable from "../Common/AtelierTable";
+import { ColumnDef } from "@tanstack/react-table";
+
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +65,90 @@ export default function Orders() {
         setLoading(false);
       });
   }, []);
+
+  const columns: ColumnDef<Order>[] = [
+    {
+      accessorKey: "order_number",
+      header: "Order Ref",
+      cell: ({ row }) => (
+        <span className="font-medium text-[#C4896A]">
+          #{row.original.order_number}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "created_at",
+      header: "Date",
+      cell: ({ row }) => (
+        <span className="text-[#7A6B5D]">
+          {new Date(row.original.created_at).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Atelier Status",
+      cell: ({ row }) => {
+        const badgeStyle = statusColorMap[row.original.status] || statusColorMap.Processing;
+        return (
+          <span
+            className="inline-block px-3 py-1 rounded-full text-xs font-medium border"
+            style={{
+              background: badgeStyle.bg,
+              color: badgeStyle.text,
+              borderColor: badgeStyle.border,
+            }}
+          >
+            {row.original.status}
+          </span>
+        );
+      },
+    },
+    {
+      id: "items",
+      header: "Items",
+      cell: ({ row }) => (
+        <span className="text-[#7A6B5D]">
+          {row.original.order_items && row.original.order_items.length > 0
+            ? `${row.original.order_items[0].title} ${
+                row.original.order_items.length > 1
+                  ? `(+${row.original.order_items.length - 1} more)`
+                  : ""
+              }`
+            : "1 Creation"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "total_amount",
+      header: "Total",
+      cell: ({ row }) => (
+        <span className="font-semibold text-[#3D2B1F]">
+          ${Number(row.original.total_amount).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <div className="text-right">Delivery Details</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => setSelectedOrder(row.original)}
+            className="py-1.5 px-4 rounded-full text-xs font-semibold tracking-wider uppercase border border-[#C4896A] text-[#C4896A] hover:bg-[#C4896A] hover:text-white transition-all duration-300"
+            style={{ fontFamily: "'Cinzel', serif" }}
+          >
+            Track Atelier
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   const getStageIndex = (status: string) => {
     const idx = stages.findIndex((s) => s.key === status);
@@ -108,73 +195,7 @@ export default function Orders() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-xl border border-[#E3C9A8]/60">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#FFFAF5] border-b border-[#E3C9A8]/60 text-[11px] uppercase tracking-wider text-[#7A6B5D]">
-                  <th className="py-4 px-6 font-semibold">Order Ref</th>
-                  <th className="py-4 px-6 font-semibold">Date</th>
-                  <th className="py-4 px-6 font-semibold">Atelier Status</th>
-                  <th className="py-4 px-6 font-semibold">Items</th>
-                  <th className="py-4 px-6 font-semibold">Total</th>
-                  <th className="py-4 px-6 font-semibold text-right">Delivery Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E3C9A8]/30 bg-white text-xs sm:text-sm text-[#3D2B1F]">
-                {orders.map((order) => {
-                  const badgeStyle = statusColorMap[order.status] || statusColorMap.Processing;
-                  const formattedDate = new Date(order.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  });
-
-                  return (
-                    <tr key={order.id} className="hover:bg-[#FFFAF5]/40 transition-colors">
-                      <td className="py-4 px-6 font-medium text-[#C4896A]">
-                        #{order.order_number}
-                      </td>
-                      <td className="py-4 px-6 text-[#7A6B5D]">{formattedDate}</td>
-                      <td className="py-4 px-6">
-                        <span
-                          className="inline-block px-3 py-1 rounded-full text-xs font-medium border"
-                          style={{
-                            background: badgeStyle.bg,
-                            color: badgeStyle.text,
-                            borderColor: badgeStyle.border,
-                          }}
-                        >
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-[#7A6B5D]">
-                        {order.order_items && order.order_items.length > 0
-                          ? `${order.order_items[0].title} ${
-                              order.order_items.length > 1
-                                ? `(+${order.order_items.length - 1} more)`
-                                : ""
-                            }`
-                          : "1 Creation"}
-                      </td>
-                      <td className="py-4 px-6 font-semibold text-[#3D2B1F]">
-                        ${Number(order.total_amount).toFixed(2)}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="py-1.5 px-4 rounded-full text-xs font-semibold tracking-wider uppercase border border-[#C4896A] text-[#C4896A] hover:bg-[#C4896A] hover:text-white transition-all duration-300"
-                          style={{ fontFamily: "'Cinzel', serif" }}
-                        >
-                          Track Atelier
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <AtelierTable data={orders} columns={columns} pageSize={6} />
         </div>
       )}
 

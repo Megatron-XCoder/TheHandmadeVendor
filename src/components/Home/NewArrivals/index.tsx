@@ -1,13 +1,20 @@
 "use client";
-import React from "react";
-import Image from "next/image";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import ProductItem from "@/components/Common/ProductItem";
 import shopData from "@/components/Shop/shopData";
+import { Product } from "@/types/product";
+
+// Function to retrieve new arrival products up to the specified limit
+const getNewArrivals = (limit: number = 8): Product[] => {
+  return shopData.slice(0, limit);
+};
 
 const NewArrival = () => {
+  const newArrivals = useMemo(() => getNewArrivals(8), []);
+
   return (
-    <section className="overflow-hidden pt-16 lg:pt-20 pb-10" style={{ background: "#FFFAF5" }}>
+    <section className="overflow-hidden pt-16 lg:pt-20 pb-16" style={{ background: "#FFFAF5" }}>
       <div className="max-w-[1170px] w-full mx-auto px-4 sm:px-8 xl:px-0">
         {/* Section title */}
         <div className="mb-10 flex flex-row items-center justify-between gap-4">
@@ -31,7 +38,7 @@ const NewArrival = () => {
 
           <Link
             href="/shop"
-            className="inline-flex items-center gap-1.5 font-medium text-sm py-2.5 px-7 rounded-full transition-all duration-300"
+            className="inline-flex items-center gap-1.5 font-medium text-sm py-2.5 px-7 rounded-full transition-all duration-300 shadow-sm"
             style={{ color: "#C4896A", border: "1px solid #E3C9A8", background: "#fff" }}
             onMouseEnter={(e: any) => {
               e.currentTarget.style.background = "#C4896A";
@@ -48,10 +55,10 @@ const NewArrival = () => {
           </Link>
         </div>
 
+        {/* New Arrivals Grid (8 cards) */}
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-          {/* New Arrivals item */}
-          {shopData.map((item, key) => (
-            <ProductItem item={item} key={key} badge="New Arrival" />
+          {newArrivals.map((item, key) => (
+            <ProductItem item={item} key={item.id || key} badge="New Arrival" />
           ))}
         </div>
       </div>

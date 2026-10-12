@@ -12,6 +12,10 @@ import { showToast } from "@/utils/toast";
 import shopData from "@/components/Shop/shopData";
 import { Product } from "@/types/product";
 import RecentlyViewdItems from "./RecentlyViewd";
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay } from "swiper/modules";
+import "swiper/css";
+import ReviewCard from "@/components/Common/ReviewCard";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Smooth Zoom on Hover
@@ -211,11 +215,22 @@ export default function ShopDetails() {
 
   // Review modal
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewsList, setReviewsList] = useState<CollectorReview[]>(COLLECTOR_REVIEWS);
   const [newRating, setNewRating] = useState(5);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newPlace, setNewPlace] = useState("");
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reviews slider navigation
+  const reviewsSliderRef = useRef<any>(null);
+  const handlePrevReview = useCallback(() => {
+    reviewsSliderRef.current?.swiper?.slidePrev();
+  }, []);
+  const handleNextReview = useCallback(() => {
+    reviewsSliderRef.current?.swiper?.slideNext();
+  }, []);
 
   // Wishlist
   const wishlistItems = useAppSelector((state) => state.wishlistReducer.items);
@@ -267,18 +282,31 @@ export default function ShopDetails() {
 
   const handleReviewSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newEmail.trim() || !newComment.trim()) {
+    if (!newName.trim() || !newEmail.trim() || !newPlace.trim() || !newComment.trim()) {
       showToast.error("Please fill in all fields");
       return;
     }
     setIsSubmitting(true);
     setTimeout(() => {
+      const newlyAddedReview: CollectorReview = {
+        id: Date.now(),
+        author: newName.trim(),
+        role: "Verified Patron",
+        location: newPlace.trim(),
+        rating: newRating,
+        date: "Just now",
+        comment: newComment.trim(),
+        verified: true,
+      };
+      setReviewsList((prev) => [newlyAddedReview, ...prev]);
       setIsSubmitting(false);
       setIsReviewModalOpen(false);
       setNewComment("");
       setNewName("");
       setNewEmail("");
-      showToast.success("Review submitted for verification");
+      setNewPlace("");
+      setNewRating(5);
+      showToast.success("Appraisal submitted successfully");
     }, 500);
   };
 
@@ -664,12 +692,34 @@ export default function ShopDetails() {
                 </div>
                 <span className="text-sm font-semibold text-[#2A1E17]">5.0</span>
                 <span className="text-xs text-[#8C7B6D]">
-                  • {COLLECTOR_REVIEWS.length} Verified Patron Appraisals
+                  • {reviewsList.length} Verified Patron Appraisals
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Carousel Prev/Next Buttons */}
+              <button
+                type="button"
+                onClick={handlePrevReview}
+                aria-label="Previous reviews"
+                className="w-10 h-10 rounded-full border border-[#E3C9A8] flex items-center justify-center text-[#3D2B1F] bg-white hover:bg-[#C4896A] hover:text-white hover:border-[#C4896A] transition-all duration-300 shadow-sm active:scale-95 cursor-pointer"
+              >
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleNextReview}
+                aria-label="Next reviews"
+                className="w-10 h-10 rounded-full border border-[#E3C9A8] flex items-center justify-center text-[#3D2B1F] bg-white hover:bg-[#C4896A] hover:text-white hover:border-[#C4896A] transition-all duration-300 shadow-sm active:scale-95 cursor-pointer"
+              >
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                </svg>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsReviewModalOpen(true)}
@@ -683,73 +733,37 @@ export default function ShopDetails() {
             </div>
           </div>
 
-          {/* Reviews Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {COLLECTOR_REVIEWS.map((rev) => {
-              const initials = rev.author
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2);
-
-              return (
-                <div
-                  key={rev.id}
-                  className="bg-white/95 rounded-2xl p-5 sm:p-6 border border-[#E3C9A8]/40 hover:border-[#C4896A]/70 shadow-[0_2px_14px_rgba(61,43,31,0.03)] hover:shadow-[0_8px_24px_rgba(196,137,106,0.1)] transition-all duration-300 flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Top row: stars + date */}
-                    <div className="flex items-center justify-between mb-3.5">
-                      <div className="flex gap-0.5">
-                        {[...Array(rev.rating)].map((_, i) => (
-                          <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill="#C4896A">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span className="text-[10px] uppercase tracking-wider text-[#A8988A] font-medium">
-                        {rev.date}
-                      </span>
-                    </div>
-
-                    {/* Review text */}
-                    <p className="text-[12.5px] sm:text-[13px] leading-[1.7] text-[#4A3B30] font-light mb-5 italic">
-                      &ldquo;{rev.comment}&rdquo;
-                    </p>
-                  </div>
-
-                  {/* Author footer */}
-                  <div className="pt-3.5 border-t border-[#EDE4D8]/60 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-[#FEF5EC] border border-[#E3C9A8]/60 flex items-center justify-center text-[10px] font-bold text-[#C4896A] shrink-0">
-                        {initials}
-                      </div>
-                      <div className="min-w-0">
-                        <span
-                          className="text-xs font-semibold text-[#2A1E17] block truncate leading-tight"
-                          style={{ fontFamily: "'Cinzel', serif" }}
-                        >
-                          {rev.author}
-                        </span>
-                        <span className="text-[10px] text-[#8C7B6D] font-light block truncate">
-                          {rev.location}
-                        </span>
-                      </div>
-                    </div>
-
-                    {rev.verified && (
-                      <span className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wider font-semibold text-[#C4896A] bg-[#FDF0E6] px-2 py-0.5 rounded-full shrink-0">
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#C4896A" strokeWidth="2.5">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        Verified
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Automatic Slider Carousel (4 seconds) */}
+          <Swiper
+            ref={reviewsSliderRef}
+            modules={[Autoplay]}
+            autoplay={{ delay: 4000, disableOnInteraction: false }}
+            spaceBetween={20}
+            slidesPerView={1}
+            breakpoints={{
+              640: { slidesPerView: 2, spaceBetween: 20 },
+              1024: { slidesPerView: 3, spaceBetween: 24 },
+            }}
+            loop={reviewsList.length > 3}
+            className="w-full !py-2"
+          >
+            {reviewsList.map((rev) => (
+              <SwiperSlide key={rev.id} className="h-auto">
+                <ReviewCard
+                  review={{
+                    author: rev.author,
+                    location: rev.location,
+                    role: rev.role,
+                    rating: rev.rating,
+                    date: rev.date,
+                    comment: rev.comment,
+                    verified: rev.verified,
+                  }}
+                  className="h-full"
+                />
+              </SwiperSlide>
+            ))}
+          </Swiper>
         </div>
       </section>
 
@@ -781,11 +795,12 @@ export default function ShopDetails() {
             </div>
 
             <form onSubmit={handleReviewSubmit} className="space-y-4">
+              {/* Rating Field */}
               <div>
                 <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7A6B5D] mb-1.5">
                   Rating
                 </label>
-                <div className="flex gap-0.5">
+                <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       type="button"
@@ -794,8 +809,8 @@ export default function ShopDetails() {
                       className="p-0.5 hover:scale-110 transition-transform cursor-pointer"
                     >
                       <svg
-                        width="18"
-                        height="18"
+                        width="20"
+                        height="20"
                         viewBox="0 0 24 24"
                         fill={star <= newRating ? "#C4896A" : "none"}
                         stroke="#C4896A"
@@ -805,9 +820,13 @@ export default function ShopDetails() {
                       </svg>
                     </button>
                   ))}
+                  <span className="text-xs font-semibold text-[#2A1E17] ml-2">
+                    {newRating}.0 / 5.0
+                  </span>
                 </div>
               </div>
 
+              {/* Name & Email Fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7A6B5D] mb-1">
@@ -837,16 +856,32 @@ export default function ShopDetails() {
                 </div>
               </div>
 
+              {/* Place Field */}
               <div>
                 <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7A6B5D] mb-1">
-                  Your Review
+                  Place
+                </label>
+                <input
+                  type="text"
+                  value={newPlace}
+                  onChange={(e) => setNewPlace(e.target.value)}
+                  required
+                  placeholder="e.g. Geneva, Switzerland or New York, USA"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-white border border-[#EDE4D8] focus:border-[#C4896A] outline-none transition-colors"
+                />
+              </div>
+
+              {/* Review Field */}
+              <div>
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7A6B5D] mb-1">
+                  Review
                 </label>
                 <textarea
                   rows={3}
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   required
-                  placeholder="Share your thoughts..."
+                  placeholder="Share your experience with this bespoke creation..."
                   className="w-full p-3 text-xs rounded-lg bg-white border border-[#EDE4D8] focus:border-[#C4896A] outline-none resize-none transition-colors"
                 />
               </div>

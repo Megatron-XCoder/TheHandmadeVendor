@@ -699,6 +699,57 @@ The platform implements an optimistic, non-blocking synchronization pipeline con
 - Unused legacy components in `src/components/ShopWithoutSidebar` and redundant dropdown files were deleted.
 - All internal navigation links (`menuData.ts`, `Hero`, `BestSeller`) updated directly to `/shop-with-sidebar`.
 
+
+## 14. Atelier Patron Portal (`/my-account`) Remake
+
+### Aesthetic & Visual Identity
+- **Brand Palette & Typography**:
+  - Background: Warm parchment canvas (`#FFFAF5` / `#FAF6F0`).
+  - Cards & Panels: Crisp rounded-2xl panels with warm `#E3C9A8`/50 borders and soft elevation shadows.
+  - Accent / Metallic: Bronze/copper `#C4896A`, walnut `#3D2B1F`, and deep espresso headings `#2A1E17`.
+  - Heading font: `'Cinzel', serif` with letter-spacing `tracking-wider`.
+- **Patron Welcome Header**:
+  - Distinctive monogram circle with copper border and patron initial badge.
+  - Displays patron's full name, email, member since date, and membership tier badge (`Patron Circle`).
+  - Quick action links for exploring creations and signing out.
+
+### Collapsible Luxury Sidebar & Responsive Navigation
+- **Desktop Collapsible Rail (Initially Closed)**:
+  - Default initial state is closed (compact 84px icon rail) for a clean minimalist first impression.
+  - Interactive toggle button smoothly expands to 300px with full labels and live count badges.
+  - Hover tooltips appear on collapsed mode for effortless usability.
+- **Mobile Section Selector & Dual Action Access**:
+  - Replaced horizontal slider pills with a custom `@headlessui/react` `AtelierDropdown` component clearly displaying the active section with badge and dropdown options.
+  - Optional "View All Sections" toggle reveals the full vertical card list.
+  - **Dual Action Buttons**: Both **[Explore Atelier]** and **[Sign Out]** buttons are conveniently positioned in the top banner AND at the bottom of the page for high responsiveness without scrolling.
+
+### Installed UI Component Libraries
+- **`@headlessui/react`**: Powers the reusable `AtelierDropdown` component used for mobile navigation and profile form select pickers.
+- **`@tanstack/react-table`**: Powers the reusable `AtelierTable` component with column definitions, interactive header sorting, and pagination across order history and data ledgers.
+
+### Functional Sections & Features
+1. **Sanctuary Overview (Dashboard)**:
+   - 4 Quick Stat Cards: Total Acquisitions, Active In-Crafting, Curated Wishlist, Patron Tier.
+   - Most Recent Acquisition preview card with 1-click jump to full order tracking.
+   - Atelier Guarantees: Artisan Provenance, White-Glove Delivery, and Private Concierge.
+2. **Bespoke Acquisitions (Orders)**:
+   - Powered by `AtelierTable` (`@tanstack/react-table`), displaying sortable order logs, status badges, and multi-stage craft tracking (Confirmed ──► Artisan Crafting ──► Quality Inspection ──► White-Glove Dispatch ──► Delivered).
+3. **Curated Wishlist**:
+   - Real-time connection to Redux store (`wishlistReducer.items`).
+   - Grid layout of saved heirlooms with thumbnail image, pricing, "Move to Bag" (adds to cart, removes from wishlist, invokes toast), and "Remove" button.
+   - Smooth pagination controls (6 items per page) with previous/next controls.
+4. **Private Coordinates (Addresses)**:
+   - Shipping Destination card and Billing Coordinates card.
+   - "Modify Shipping Address" and "Modify Billing Address" buttons opening the newly styled `AddressModal` with local persistence fallback.
+5. **Patron Profile & Ledger**:
+   - Editable fields: First Name, Last Name, Contact Phone, Country, Preferred Currency, Monogram Initials.
+   - Uses `AtelierDropdown` for Country and Currency selections.
+   - Direct update to Supabase `public.profiles` with toast confirmation.
+6. **Security & Cryptographic Keys**:
+   - Password update form connected to Supabase `auth.updateUser`.
+   - Real-time Password Strength indicator (Fragile, Moderate, Artisan Grade, Impenetrable).
+   - 256-bit AES encryption session status badge.
+
 ---
 
 *Documentation maintained for The Handmade Vendor repository.*

@@ -1,10 +1,55 @@
-import React, { useEffect } from "react";
+"use client";
+import React, { useEffect, useState } from "react";
 
-const AddressModal = ({ isOpen, closeModal }) => {
+export interface AddressData {
+  name: string;
+  email?: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+interface AddressModalProps {
+  isOpen: boolean;
+  closeModal: () => void;
+  addressType?: "shipping" | "billing";
+  initialData?: AddressData;
+  onSave?: (data: AddressData, type: "shipping" | "billing") => void;
+}
+
+const AddressModal: React.FC<AddressModalProps> = ({
+  isOpen,
+  closeModal,
+  addressType = "shipping",
+  initialData,
+  onSave,
+}) => {
+  const [formData, setFormData] = useState<AddressData>({
+    name: "James Septimus",
+    email: "james@example.com",
+    phone: "+1 (555) 234-5678",
+    street: "7398 Smoke Ranch Road",
+    city: "Las Vegas",
+    state: "Nevada",
+    postalCode: "89128",
+    country: "United States",
+  });
+
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
   useEffect(() => {
-    // closing modal while clicking outside
-    function handleClickOutside(event) {
-      if (!event.target.closest(".modal-content")) {
+    if (initialData) {
+      setFormData(initialData);
+    }
+  }, [initialData, isOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (isOpen && !target.closest(".modal-content")) {
         closeModal();
       }
     }
@@ -12,111 +57,208 @@ const AddressModal = ({ isOpen, closeModal }) => {
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, closeModal]);
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onSave) {
+      onSave(formData, addressType);
+    }
+    setSavedSuccess(true);
+    setTimeout(() => {
+      setSavedSuccess(false);
+      closeModal();
+    }, 800);
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div
-      className={`fixed top-0 left-0 overflow-y-auto no-scrollbar w-full h-screen sm:py-20 xl:py-25 2xl:py-[230px] bg-dark/70 sm:px-8 px-4 py-5 ${isOpen ? "block z-99999" : "hidden"
-        }`}
-    >
-      <div className="flex items-center justify-center ">
-        <div
-          x-show="addressModal"
-          className="w-full max-w-[1100px] rounded-xl shadow-3 bg-white p-7.5 relative modal-content"
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto px-4 py-8 bg-[#2A1E17]/60 backdrop-blur-sm transition-opacity duration-300">
+      <div className="modal-content relative w-full max-w-[680px] bg-[#FFFFFF] rounded-2xl border border-[#E3C9A8]/60 shadow-[0_20px_50px_rgba(42,30,23,0.25)] p-6 sm:p-10 text-[#3D2B1F] animate-in fade-in zoom-in-95 duration-200">
+        {/* Close Button */}
+        <button
+          onClick={closeModal}
+          aria-label="Close modal"
+          className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center text-[#7A6B5D] hover:text-[#3D2B1F] hover:bg-[#FFFAF5] border border-transparent hover:border-[#E3C9A8]/40 transition-all duration-200"
         >
-          <button
-            onClick={closeModal}
-            aria-label="button for close modal"
-            className="absolute top-0 right-0 sm:top-3 sm:right-3 flex items-center justify-center w-10 h-10 rounded-full ease-in duration-150 bg-meta text-body hover:text-dark"
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Header */}
+        <div className="mb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium tracking-widest uppercase bg-[#FFFAF5] border border-[#E3C9A8]/60 text-[#C4896A] mb-2">
+            <span>✦</span>
+            <span>{addressType === "shipping" ? "Shipping Destination" : "Billing Address"}</span>
+          </div>
+          <h3
+            className="text-2xl font-normal text-[#2A1E17] tracking-wider"
+            style={{ fontFamily: "'Cinzel', serif" }}
           >
-            <svg
-              className="fill-current"
-              width="26"
-              height="26"
-              viewBox="0 0 26 26"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M14.3108 13L19.2291 8.08167C19.5866 7.72417 19.5866 7.12833 19.2291 6.77083C19.0543 6.59895 18.8189 6.50262 18.5737 6.50262C18.3285 6.50262 18.0932 6.59895 17.9183 6.77083L13 11.6892L8.08164 6.77083C7.90679 6.59895 7.67142 6.50262 7.42623 6.50262C7.18104 6.50262 6.94566 6.59895 6.77081 6.77083C6.41331 7.12833 6.41331 7.72417 6.77081 8.08167L11.6891 13L6.77081 17.9183C6.41331 18.2758 6.41331 18.8717 6.77081 19.2292C7.12831 19.5867 7.72414 19.5867 8.08164 19.2292L13 14.3108L17.9183 19.2292C18.2758 19.5867 18.8716 19.5867 19.2291 19.2292C19.5866 18.8717 19.5866 18.2758 19.2291 17.9183L14.3108 13Z"
-                fill=""
+            {addressType === "shipping" ? "Update Delivery Destination" : "Update Billing Coordinates"}
+          </h3>
+          <p className="text-xs text-[#7A6B5D] mt-1.5">
+            Precision delivery details ensure your bespoke handcrafted items arrive in pristine atelier care.
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+                Recipient Full Name *
+              </label>
+              <input
+                type="text"
+                name="name"
+                required
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Lord / Lady Full Name"
+                className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
               />
-            </svg>
-          </button>
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+                Contact Phone *
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                required
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="+1 (555) 000-0000"
+                className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
+              />
+            </div>
+          </div>
 
           <div>
-            <form>
-              <div className="flex flex-col lg:flex-row gap-5 sm:gap-8 mb-5">
-                <div className="w-full">
-                  <label htmlFor="name" className="block mb-2.5">
-                    Name
-                  </label>
-
-                  <input
-                    type="text"
-                    name="name"
-                    value="James Septimus"
-                    className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full py-2.5 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                  />
-                </div>
-
-                <div className="w-full">
-                  <label htmlFor="email" className="block mb-2.5">
-                    Email
-                  </label>
-
-                  <input
-                    type="email"
-                    name="email"
-                    value="jamse@example.com"
-                    className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full py-2.5 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col lg:flex-row gap-5 sm:gap-8 mb-5">
-                <div className="w-full">
-                  <label htmlFor="phone" className="block mb-2.5">
-                    Phone
-                  </label>
-
-                  <input
-                    type="text"
-                    name="phone"
-                    value="1234 567890"
-                    className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full py-2.5 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                  />
-                </div>
-
-                <div className="w-full">
-                  <label htmlFor="address" className="block mb-2.5">
-                    Address
-                  </label>
-
-                  <input
-                    type="text"
-                    name="address"
-                    value="7398 Smoke Ranch RoadLas Vegas, Nevada 89128"
-                    className="rounded-md border border-gray-3 bg-gray-1 placeholder:text-dark-5 w-full py-2.5 px-5 outline-none duration-200 focus:border-transparent focus:shadow-input focus:ring-2 focus:ring-blue/20"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="inline-flex font-medium text-white bg-blue py-3 px-7 rounded-md ease-out duration-200 hover:bg-blue-dark"
-              >
-                Save Changes
-              </button>
-            </form>
+            <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+              Street Address & Residence *
+            </label>
+            <input
+              type="text"
+              name="street"
+              required
+              value={formData.street}
+              onChange={handleChange}
+              placeholder="Suite, Estate, Street name"
+              className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
+            />
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+                City *
+              </label>
+              <input
+                type="text"
+                name="city"
+                required
+                value={formData.city}
+                onChange={handleChange}
+                placeholder="Florence / New York"
+                className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+                State / Region *
+              </label>
+              <input
+                type="text"
+                name="state"
+                required
+                value={formData.state}
+                onChange={handleChange}
+                placeholder="State or Province"
+                className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+                Postal Code *
+              </label>
+              <input
+                type="text"
+                name="postalCode"
+                required
+                value={formData.postalCode}
+                onChange={handleChange}
+                placeholder="Postal / Zip"
+                className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-1.5 font-medium">
+              Country / Destination *
+            </label>
+            <select
+              name="country"
+              value={formData.country}
+              onChange={handleChange}
+              className="w-full px-4 py-2.5 rounded-lg bg-[#FFFAF5]/60 border border-[#E3C9A8]/50 text-sm text-[#2A1E17] focus:outline-none focus:border-[#C4896A] focus:ring-1 focus:ring-[#C4896A]/40 transition-colors"
+            >
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Italy">Italy (Florence Atelier Hub)</option>
+              <option value="France">France</option>
+              <option value="Switzerland">Switzerland</option>
+              <option value="United Arab Emirates">United Arab Emirates</option>
+              <option value="Australia">Australia</option>
+              <option value="Canada">Canada</option>
+              <option value="Japan">Japan</option>
+              <option value="Singapore">Singapore</option>
+            </select>
+          </div>
+
+          {/* Action buttons */}
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-end gap-3 border-t border-[#E3C9A8]/30">
+            <button
+              type="button"
+              onClick={closeModal}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-full border border-[#E3C9A8] text-xs font-medium tracking-wider uppercase text-[#3D2B1F] hover:bg-[#FFFAF5] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-7 py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              {savedSuccess ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Saved to Profile</span>
+                </>
+              ) : (
+                <span>Save Coordinates</span>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

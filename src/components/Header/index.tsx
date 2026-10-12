@@ -186,32 +186,37 @@ const IconBtn = ({
   label,
   onClick,
   active = false,
+  as = "button",
 }: {
   children: React.ReactNode;
   label: string;
   onClick?: () => void;
   active?: boolean;
-}) => (
-  <button
-    aria-label={label}
-    onClick={onClick}
-    className="relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200"
-    style={{
-      color: active ? "#C4896A" : "#555",
-      background: active ? "#FFFAF5" : "transparent",
-    }}
-    onMouseEnter={(e) => {
-      (e.currentTarget as HTMLElement).style.color = "#C4896A";
-      (e.currentTarget as HTMLElement).style.background = "#FFFAF5";
-    }}
-    onMouseLeave={(e) => {
-      (e.currentTarget as HTMLElement).style.color = active ? "#C4896A" : "#555";
-      (e.currentTarget as HTMLElement).style.background = active ? "#FFFAF5" : "transparent";
-    }}
-  >
-    {children}
-  </button>
-);
+  as?: "button" | "div";
+}) => {
+  const Component = as;
+  return (
+    <Component
+      aria-label={label}
+      onClick={onClick}
+      className="relative flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 cursor-pointer"
+      style={{
+        color: active ? "#C4896A" : "#555",
+        background: active ? "#FFFAF5" : "transparent",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.color = "#C4896A";
+        (e.currentTarget as HTMLElement).style.background = "#FFFAF5";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.color = active ? "#C4896A" : "#555";
+        (e.currentTarget as HTMLElement).style.background = active ? "#FFFAF5" : "transparent";
+      }}
+    >
+      {children}
+    </Component>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Header
@@ -435,20 +440,19 @@ const Header = () => {
               <div className="hidden lg:block">
                 {currentUser ? (
                   <div className="relative" ref={userMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      aria-label="User account"
-                      className="relative"
-                    >
-                      <IconBtn label="My Account" active={userMenuOpen}>
+                    <div className="relative inline-block">
+                      <IconBtn
+                        label="User account"
+                        onClick={() => setUserMenuOpen(!userMenuOpen)}
+                        active={userMenuOpen}
+                      >
                         <UserIcon />
                       </IconBtn>
                       <span
                         className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none"
                         style={{ background: "#C4896A" }}
                       />
-                    </button>
+                    </div>
 
                     {userMenuOpen && (
                       <div
@@ -496,7 +500,7 @@ const Header = () => {
                   </div>
                 ) : (
                   <Link href="/signin" aria-label="Sign in">
-                    <IconBtn label="Sign in" active={pathUrl === "/signin" || pathUrl === "/profile"}>
+                    <IconBtn as="div" label="Sign in" active={pathUrl === "/signin" || pathUrl === "/profile"}>
                       <UserIcon />
                     </IconBtn>
                   </Link>
