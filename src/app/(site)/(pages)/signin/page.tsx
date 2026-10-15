@@ -1,16 +1,18 @@
 import Signin from "@/components/Auth/Signin";
-import React from "react";
+import React, { Suspense } from "react";
 import { Metadata } from "next";
+
 export const metadata: Metadata = {
   title: "Sign In | The Handmade Vendor",
-  description: "This is Signin Page for NextCommerce Template",
-  // other metadata
+  description: "Sign in to your patron account",
 };
 
 const SigninPage = () => {
   return (
     <main>
-      <Signin />
+      <Suspense fallback={<div className="min-h-screen bg-[#FFFAF5]" />}>
+        <Signin />
+      </Suspense>
     </main>
   );
 };

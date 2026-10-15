@@ -109,7 +109,7 @@ export async function syncCartWithDatabase(
 
     return Array.from(mergedMap.values());
   } catch (err) {
-    console.error("Cart sync error:", err);
+    console.warn("Cart sync notice (network/supabase unavailable):", err?.message || err);
     return localItems;
   }
 }
@@ -174,8 +174,8 @@ export async function syncWishlistWithDatabase(
     }
 
     return Array.from(mergedMap.values());
-  } catch (err) {
-    console.error("Wishlist sync error:", err);
+  } catch (err: any) {
+    console.warn("Wishlist sync notice (network/supabase unavailable):", err?.message || err);
     return localItems;
   }
 }
@@ -200,8 +200,8 @@ export async function persistCartItemToDatabase(
     }, {
       onConflict: "user_id,product_id",
     });
-  } catch (err) {
-    console.error("Failed to persist cart item to database:", err);
+  } catch (err: any) {
+    console.warn("Cart item persist notice:", err?.message || err);
   }
 }
 
@@ -219,8 +219,8 @@ export async function removeCartItemFromDatabase(
       .delete()
       .eq("user_id", userId)
       .eq("product_id", String(productId));
-  } catch (err) {
-    console.error("Failed to remove cart item from database:", err);
+  } catch (err: any) {
+    console.warn("Cart item removal notice:", err?.message || err);
   }
 }
 
@@ -242,8 +242,8 @@ export async function persistWishlistItemToDatabase(
     }, {
       onConflict: "user_id,product_id",
     });
-  } catch (err) {
-    console.error("Failed to persist wishlist item to database:", err);
+  } catch (err: any) {
+    console.warn("Wishlist item persist notice:", err?.message || err);
   }
 }
 
@@ -261,8 +261,8 @@ export async function removeWishlistItemFromDatabase(
       .delete()
       .eq("user_id", userId)
       .eq("product_id", String(productId));
-  } catch (err) {
-    console.error("Failed to remove wishlist item from database:", err);
+  } catch (err: any) {
+    console.warn("Wishlist item removal notice:", err?.message || err);
   }
 }
 

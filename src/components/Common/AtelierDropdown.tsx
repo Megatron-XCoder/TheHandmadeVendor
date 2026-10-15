@@ -20,6 +20,8 @@ interface AtelierDropdownProps {
   buttonClassName?: string;
   menuClassName?: string;
   align?: "left" | "right";
+  searchable?: boolean;
+  disabled?: boolean;
 }
 
 export default function AtelierDropdown({
@@ -31,8 +33,21 @@ export default function AtelierDropdown({
   buttonClassName = "",
   menuClassName = "",
   align = "left",
+  searchable = false,
+  disabled = false,
 }: AtelierDropdownProps) {
+  const [searchQuery, setSearchQuery] = React.useState("");
   const selectedItem = items.find((i) => i.id === selectedId);
+
+  const filteredItems = React.useMemo(() => {
+    if (!searchable || !searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        (item.sublabel && item.sublabel.toLowerCase().includes(q))
+    );
+  }, [items, searchQuery, searchable]);
 
   return (
     <div className={`relative inline-block text-left ${className}`}>
@@ -40,7 +55,8 @@ export default function AtelierDropdown({
         {({ open }) => (
           <>
             <MenuButton
-              className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#FFFFFF] border border-[#E3C9A8]/70 text-[#3D2B1F] text-xs sm:text-sm font-medium shadow-[0_4px_12px_rgba(61,43,31,0.04)] hover:border-[#C4896A] hover:bg-[#FFFAF5] focus:outline-none focus:ring-1 focus:ring-[#C4896A] transition-all duration-200 ${buttonClassName}`}
+              disabled={disabled}
+              className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#FFFFFF] border border-[#E3C9A8]/70 text-[#3D2B1F] text-xs sm:text-sm font-medium shadow-[0_4px_12px_rgba(61,43,31,0.04)] hover:border-[#C4896A] hover:bg-[#FFFAF5] focus:outline-none focus:ring-1 focus:ring-[#C4896A] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${buttonClassName}`}
             >
               <div className="flex items-center gap-2.5 truncate">
                 {selectedItem?.icon && (
@@ -77,17 +93,39 @@ export default function AtelierDropdown({
               leave="transition ease-in duration-100"
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
+              afterLeave={() => setSearchQuery("")}
             >
               <MenuItems
-                className={`absolute z-[999] mt-2 w-full min-w-[220px] rounded-2xl bg-[#FFFFFF] border border-[#E3C9A8]/80 p-2 shadow-[0_16px_40px_rgba(61,43,31,0.12)] backdrop-blur-md focus:outline-none max-h-80 overflow-y-auto no-scrollbar ${
+                className={`absolute z-[9999] mt-2 w-full min-w-[220px] rounded-2xl bg-[#FFFFFF] border border-[#E3C9A8]/80 shadow-[0_16px_40px_rgba(61,43,31,0.12)] backdrop-blur-md focus:outline-none max-h-80 flex flex-col ${
                   align === "right" ? "right-0" : "left-0"
                 } ${menuClassName}`}
               >
-                {items.map((item) => {
-                  const isSelected = item.id === selectedId;
+                {searchable && (
+                  <div className="p-2 pb-1.5 bg-[#FFFFFF] rounded-t-2xl border-b border-[#E3C9A8]/30 flex-shrink-0">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Type to filter..."
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E3C9A8]/70 bg-[#FFFAF5] text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A]"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                  </div>
+                )}
+                <div className="p-2 overflow-y-auto flex-1 no-scrollbar">
 
-                  return (
-                    <MenuItem key={item.id} disabled={item.disabled}>
+                {filteredItems.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-[#7A6B5D]">
+                    No options found
+                  </div>
+                ) : (
+                  filteredItems.map((item) => {
+                    const isSelected = item.id === selectedId;
+
+                    return (
+                      <MenuItem key={item.id} disabled={item.disabled}>
                       {({ active, disabled }) => (
                         <button
                           type="button"
@@ -146,8 +184,10 @@ export default function AtelierDropdown({
                       )}
                     </MenuItem>
                   );
-                })}
-              </MenuItems>
+                })
+              )}
+                </div>
+            </MenuItems>
             </Transition>
           </>
         )}

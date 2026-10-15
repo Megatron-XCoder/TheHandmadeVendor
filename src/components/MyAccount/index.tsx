@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import AddressModal, { AddressData } from "./AddressModal";
+import AddressModal from "./AddressModal";
+import ProductItem from "../Common/ProductItem";
 import Orders from "../Orders";
 import { createClient } from "@/utils/supabase/client";
 import { useAppSelector } from "@/redux/store";
@@ -12,6 +13,14 @@ import { addItemToCart } from "@/redux/features/cart-slice";
 import { removeItemFromWishlist } from "@/redux/features/wishlist-slice";
 import { showToast } from "@/utils/toast";
 import AtelierDropdown, { DropdownItem } from "../Common/AtelierDropdown";
+import {
+  SavedAddress,
+  getSavedAddresses,
+  saveAddress,
+  setDefaultAddress,
+  deleteAddress,
+  MAX_SAVED_ADDRESSES,
+} from "@/utils/addressSync";
 
 export default function MyAccount() {
   const router = useRouter();
@@ -20,11 +29,21 @@ export default function MyAccount() {
   // Tab navigation state - initial sidebar collapsed per user request
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
-  // Address Modal state
+  // Addresses state - starts EMPTY for every user initially per user request
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [addressModalOpen, setAddressModalOpen] = useState(false);
-  const [addressModalType, setAddressModalType] = useState<"shipping" | "billing">("shipping");
+  const [editingAddress, setEditingAddress] = useState<SavedAddress | null>(null);
+  const [addressToDelete, setAddressToDelete] = useState<SavedAddress | null>(null);
+  const [deletingAddress, setDeletingAddress] = useState(false);
+
+  // Compute tags already used by other saved addresses
+  const usedTags = useMemo(() => {
+    return addresses
+      .filter((a) => !editingAddress || a.id !== editingAddress.id)
+      .map((a) => a.tag);
+  }, [addresses, editingAddress]);
 
   // User & Profile State
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -34,27 +53,6 @@ export default function MyAccount() {
   // Orders summary state
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
-
-  // Addresses state (persisted locally)
-  const [shippingAddress, setShippingAddress] = useState<AddressData>({
-    name: "James Septimus",
-    phone: "+1 (555) 234-5678",
-    street: "7398 Smoke Ranch Road",
-    city: "Las Vegas",
-    state: "Nevada",
-    postalCode: "89128",
-    country: "United States",
-  });
-
-  const [billingAddress, setBillingAddress] = useState<AddressData>({
-    name: "James Septimus",
-    phone: "+1 (555) 234-5678",
-    street: "7398 Smoke Ranch Road",
-    city: "Las Vegas",
-    state: "Nevada",
-    postalCode: "89128",
-    country: "United States",
-  });
 
   // Account details form state
   const [profileForm, setProfileForm] = useState({
@@ -115,26 +113,35 @@ export default function MyAccount() {
               lastName: data.user.user_metadata?.last_name || "",
             }));
           }
+        } else {
+          router.replace("/signin?redirect=/my-account");
         }
       } catch (err) {
         console.warn("Could not load user profile:", err);
+        router.replace("/signin?redirect=/my-account");
       } finally {
         setLoadingProfile(false);
       }
     }
 
     loadUser();
+  }, [router]);
 
-    // Load persisted addresses from localStorage if available
-    try {
-      const savedShip = localStorage.getItem("thv_shipping_address");
-      if (savedShip) setShippingAddress(JSON.parse(savedShip));
-      const savedBill = localStorage.getItem("thv_billing_address");
-      if (savedBill) setBillingAddress(JSON.parse(savedBill));
-    } catch (e) {
-      // LocalStorage unavailable
+  // Load persisted user addresses (empty initially, up to 3 max, synced to Supabase & localStorage)
+  useEffect(() => {
+    async function loadAddresses() {
+      setLoadingAddresses(true);
+      try {
+        const loaded = await getSavedAddresses(currentUser?.id);
+        setAddresses(loaded);
+      } catch (e) {
+        console.warn("Addresses load notice:", e);
+      } finally {
+        setLoadingAddresses(false);
+      }
     }
-  }, []);
+    loadAddresses();
+  }, [currentUser?.id]);
 
   // Fetch orders summary for stats
   useEffect(() => {
@@ -192,20 +199,41 @@ export default function MyAccount() {
     return wishlistItems.slice(start, start + wishlistPageSize);
   }, [wishlistItems, wishlistPage]);
 
-  // Handle Address Save
-  const handleAddressSave = (updatedData: AddressData, type: "shipping" | "billing") => {
-    if (type === "shipping") {
-      setShippingAddress(updatedData);
-      try {
-        localStorage.setItem("thv_shipping_address", JSON.stringify(updatedData));
-      } catch (e) {}
-    } else {
-      setBillingAddress(updatedData);
-      try {
-        localStorage.setItem("thv_billing_address", JSON.stringify(updatedData));
-      } catch (e) {}
+  // Handle Address Save (create or update, with max 3 enforcement and tag management)
+  const handleSaveAddress = async (data: SavedAddress) => {
+    try {
+      const updated = await saveAddress(data, currentUser?.id);
+      setAddresses(updated);
+      showToast.success(editingAddress ? "Address updated successfully." : "New address added to profile.");
+      setAddressModalOpen(false);
+      setEditingAddress(null);
+    } catch (err: any) {
+      showToast.error(err.message || "Failed to save address.");
     }
-    showToast.success(`${type === "shipping" ? "Shipping" : "Billing"} coordinates updated.`);
+  };
+
+  const handleDeleteAddress = async (id: string) => {
+    setDeletingAddress(true);
+    try {
+      const updated = await deleteAddress(id, currentUser?.id);
+      setAddresses(updated);
+      showToast.info("Address removed from profile.");
+      setAddressToDelete(null);
+    } catch (err: any) {
+      showToast.error("Failed to remove address.");
+    } finally {
+      setDeletingAddress(false);
+    }
+  };
+
+  const handleSetDefaultAddress = async (address: SavedAddress) => {
+    try {
+      const updated = await setDefaultAddress(address.id, currentUser?.id);
+      setAddresses(updated);
+      showToast.success(`"${address.firstName} ${address.lastName}" set as Default delivery address.`);
+    } catch (err: any) {
+      showToast.error("Failed to update default address.");
+    }
   };
 
   // Handle Profile Update
@@ -349,7 +377,7 @@ export default function MyAccount() {
     },
     {
       id: "orders",
-      label: "Bespoke Acquisitions",
+      label: "Orders",
       shortLabel: "Orders",
       badge: orders.length > 0 ? `${orders.length}` : null,
       icon: (
@@ -375,7 +403,7 @@ export default function MyAccount() {
     },
     {
       id: "addresses",
-      label: "Private Coordinates",
+      label: "Addresses",
       shortLabel: "Addresses",
       badge: null,
       icon: (
@@ -438,8 +466,26 @@ export default function MyAccount() {
     { id: "GBP (£)", label: "GBP (£) - British Pound" },
   ];
 
+  if (loadingProfile) {
+    return (
+      <section className="min-h-screen pt-36 pb-24 bg-[#FFFAF5] flex flex-col items-center justify-center text-[#3D2B1F] antialiased">
+        <div className="w-10 h-10 border-2 border-[#C4896A]/30 border-t-[#C4896A] rounded-full animate-spin mb-4" />
+        <p
+          className="text-xs uppercase tracking-widest text-[#7A6B5D]"
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
+          Verifying Patron Credentials...
+        </p>
+      </section>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
+  }
+
   return (
-    <section className="min-h-screen py-8 lg:py-16 bg-[#FFFAF5] text-[#3D2B1F] antialiased">
+    <section className="min-h-screen pt-28 sm:pt-32 lg:pt-36 pb-16 lg:pb-24 bg-[#FFFAF5] text-[#3D2B1F] antialiased">
       <div className="max-w-[1360px] w-full mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Atelier Patron Header Banner (Email removed, buttons shown with high responsiveness) */}
         <div className="mb-8 bg-gradient-to-r from-[#FFFFFF] via-[#FFFDFB] to-[#FAF4EC] rounded-3xl border border-[#E3C9A8]/50 shadow-[0_10px_35px_-5px_rgba(61,43,31,0.06)] p-6 sm:p-8 lg:p-10 relative overflow-hidden">
@@ -511,75 +557,24 @@ export default function MyAccount() {
           </div>
         </div>
 
-        {/* Mobile Section Selector (Powered by @headlessui/react AtelierDropdown + Desktop-style list toggle) */}
-        <div className="lg:hidden mb-8 space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <span
-              className="text-xs font-semibold uppercase tracking-wider text-[#7A6B5D]"
-              style={{ fontFamily: "'Cinzel', serif" }}
-            >
-              Account Section:
-            </span>
-
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-xs text-[#C4896A] hover:text-[#3D2B1F] font-medium transition-colors"
-            >
-              {isMobileMenuOpen ? "Close Full View ✕" : "View All Sections ☰"}
-            </button>
-          </div>
+        {/* Mobile Section Selector (Powered by @headlessui/react AtelierDropdown) */}
+        <div className="lg:hidden mb-8 space-y-2">
+          <span
+            className="text-xs font-semibold uppercase tracking-wider text-[#7A6B5D] block"
+            style={{ fontFamily: "'Cinzel', serif" }}
+          >
+            Account Section:
+          </span>
 
           {/* Luxury Dropdown using @headlessui/react */}
           <AtelierDropdown
             items={mobileNavDropdownItems}
             selectedId={activeTab}
-            onSelect={(id) => {
-              setActiveTab(id);
-              setIsMobileMenuOpen(false);
-            }}
-            placeholder="Select Atelier Section"
+            onSelect={(id) => setActiveTab(id)}
+            placeholder="Select Section"
             className="w-full"
             buttonClassName="py-3 px-4 rounded-2xl bg-white border-[#E3C9A8]"
           />
-
-          {/* Full vertical navigation card on mobile if toggled */}
-          {isMobileMenuOpen && (
-            <div className="bg-[#FFFFFF] rounded-2xl border border-[#E3C9A8]/70 p-3 shadow-lg space-y-1.5 animate-in fade-in duration-200">
-              {navItems.map((item) => {
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-medium transition-colors ${
-                      isActive
-                        ? "bg-[#3D2B1F] text-white shadow-sm"
-                        : "text-[#3D2B1F] hover:bg-[#FFFAF5]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={isActive ? "text-[#C4896A]" : "text-[#7A6B5D]"}>
-                        {item.icon}
-                      </span>
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge && (
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          isActive ? "bg-[#C4896A] text-white" : "bg-[#FEF5EC] text-[#C4896A]"
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
         {/* Main Account Layout: Collapsible Sidebar (initially closed) + Content View */}
@@ -855,48 +850,6 @@ export default function MyAccount() {
                     </div>
                   )}
                 </div>
-
-                {/* Atelier Guarantees & Concierge Assistance */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#E3C9A8]/50 shadow-sm space-y-2">
-                    <div className="text-[#C4896A] text-xl">🛡️</div>
-                    <h4
-                      className="text-sm font-semibold text-[#2A1E17] uppercase tracking-wider"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      Artisan Provenance
-                    </h4>
-                    <p className="text-xs text-[#7A6B5D] leading-relaxed">
-                      Every piece is hallmarked with authenticity credentials, meticulously assembled in Florence ateliers.
-                    </p>
-                  </div>
-
-                  <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#E3C9A8]/50 shadow-sm space-y-2">
-                    <div className="text-[#C4896A] text-xl">🕊️</div>
-                    <h4
-                      className="text-sm font-semibold text-[#2A1E17] uppercase tracking-wider"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      White-Glove Delivery
-                    </h4>
-                    <p className="text-xs text-[#7A6B5D] leading-relaxed">
-                      Insured private transit with tamper-evident wax seal security packaging straight to your residence.
-                    </p>
-                  </div>
-
-                  <div className="p-6 rounded-2xl bg-[#FFFFFF] border border-[#E3C9A8]/50 shadow-sm space-y-2">
-                    <div className="text-[#C4896A] text-xl">✦</div>
-                    <h4
-                      className="text-sm font-semibold text-[#2A1E17] uppercase tracking-wider"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      Private Concierge
-                    </h4>
-                    <p className="text-xs text-[#7A6B5D] leading-relaxed">
-                      Direct assistance for custom bespoke dimensions, personalized initials, and bridal curations.
-                    </p>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -913,7 +866,7 @@ export default function MyAccount() {
                     className="text-2xl sm:text-3xl font-normal text-[#2A1E17] tracking-wider mt-1"
                     style={{ fontFamily: "'Cinzel', serif" }}
                   >
-                    Bespoke Acquisitions
+                    Orders
                   </h2>
                   <p className="text-xs sm:text-sm text-[#7A6B5D] mt-1.5">
                     Monitor ongoing workshop crafting, dispatch logs, and historical acquisition records.
@@ -977,63 +930,25 @@ export default function MyAccount() {
                 ) : (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {currentWishlistItems.map((item) => {
-                        const previewImage =
-                          item.imgs?.previews?.[0] || item.imgs?.thumbnails?.[0] || "/images/products/product-1-bg-1.png";
-
-                        return (
-                          <div
-                            key={item.id}
-                            className="group bg-[#FFFAF5] rounded-2xl border border-[#E3C9A8]/50 p-4 flex flex-col justify-between hover:border-[#C4896A] hover:shadow-lg transition-all duration-300"
-                          >
-                            <div>
-                              <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#FFFFFF] border border-[#E3C9A8]/30 mb-4">
-                                <Image
-                                  src={previewImage}
-                                  alt={item.title}
-                                  fill
-                                  className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"
-                                />
-                                <button
-                                  onClick={() => handleRemoveWishlist(item.id, item.title)}
-                                  title="Remove from wishlist"
-                                  className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm border border-[#E3C9A8]/60 text-[#7A6B5D] hover:text-[#B91C1C] flex items-center justify-center transition-colors shadow-sm"
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                  </svg>
-                                </button>
-                              </div>
-
-                              <h4 className="text-sm font-medium text-[#2A1E17] line-clamp-1 mb-1">
-                                {item.title}
-                              </h4>
-
-                              <div className="flex items-center gap-2 mb-4">
-                                <span className="text-sm font-semibold text-[#C4896A]">
-                                  ${(item.discountedPrice || item.price).toFixed(2)}
-                                </span>
-                                {item.discountedPrice && item.discountedPrice < item.price && (
-                                  <span className="text-xs text-[#A8988B] line-through">
-                                    ${item.price.toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              onClick={() => handleMoveToCart(item)}
-                              className="w-full py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-sm flex items-center justify-center gap-2"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                              </svg>
-                              <span>Move to Bag</span>
-                            </button>
+                      {currentWishlistItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex flex-col h-full bg-[#FFFFFF] p-4 rounded-2xl border border-[#E3C9A8]/50 shadow-[0_4px_20px_rgba(61,43,31,0.03)] hover:border-[#C4896A] transition-all"
+                        >
+                          <div className="flex-1">
+                            <ProductItem item={item as any} />
                           </div>
-                        );
-                      })}
+                          <button
+                            onClick={() => handleMoveToCart(item)}
+                            className="mt-3 w-full py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-sm flex items-center justify-center gap-2"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                            <span>Move to Bag</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
 
                     {/* Pagination Controls */}
@@ -1080,126 +995,169 @@ export default function MyAccount() {
             )}
 
             {/* ============================================================== */}
-            {/* 4. PRIVATE COORDINATES (ADDRESSES) TAB                          */}
+            {/* 4. ADDRESSES TAB (EMPTY INITIALLY, MAX 3, TAGGED, SUPABASE DB) */}
             {/* ============================================================== */}
             {activeTab === "addresses" && (
               <div className="bg-[#FFFFFF] rounded-3xl border border-[#E3C9A8]/50 shadow-[0_8px_30px_rgba(61,43,31,0.04)] p-6 sm:p-10 animate-in fade-in duration-300">
-                <div className="mb-8 pb-6 border-b border-[#E3C9A8]/30">
-                  <span className="text-[11px] font-medium uppercase tracking-widest text-[#C4896A]">
-                    Delivery Book
-                  </span>
-                  <h2
-                    className="text-2xl sm:text-3xl font-normal text-[#2A1E17] tracking-wider mt-1"
-                    style={{ fontFamily: "'Cinzel', serif" }}
-                  >
-                    Private Coordinates
-                  </h2>
-                  <p className="text-xs sm:text-sm text-[#7A6B5D] mt-1.5">
-                    Maintain your primary residence, atelier shipping destinations, and billing records.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Shipping Address Card */}
-                  <div className="bg-[#FFFAF5] rounded-2xl border border-[#E3C9A8]/60 p-6 flex flex-col justify-between shadow-sm">
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-[#FEF5EC] border border-[#E3C9A8]/60 text-[#C4896A]">
-                          Default Delivery
-                        </span>
-
-                        <button
-                          onClick={() => {
-                            setAddressModalType("shipping");
-                            setAddressModalOpen(true);
-                          }}
-                          className="text-xs font-medium text-[#3D2B1F] hover:text-[#C4896A] underline transition-colors"
-                        >
-                          Edit
-                        </button>
-                      </div>
-
-                      <h4
-                        className="text-base font-semibold text-[#2A1E17] mb-2"
-                        style={{ fontFamily: "'Cinzel', serif" }}
-                      >
-                        Shipping Destination
-                      </h4>
-
-                      <div className="space-y-1.5 text-xs text-[#7A6B5D] leading-relaxed">
-                        <p className="font-medium text-[#2A1E17]">{shippingAddress.name}</p>
-                        <p>{shippingAddress.street}</p>
-                        <p>
-                          {shippingAddress.city}, {shippingAddress.state} {shippingAddress.postalCode}
-                        </p>
-                        <p>{shippingAddress.country}</p>
-                        <p className="pt-2 text-[#C4896A]">Phone: {shippingAddress.phone}</p>
-                      </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#E3C9A8]/30">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium uppercase tracking-widest text-[#C4896A]">
+                        Delivery Book
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FEF5EC] text-[#C4896A] border border-[#E3C9A8]/60">
+                        {addresses.length} / {MAX_SAVED_ADDRESSES} Max
+                      </span>
                     </div>
-
-                    <div className="pt-6 mt-6 border-t border-[#E3C9A8]/30">
-                      <button
-                        onClick={() => {
-                          setAddressModalType("shipping");
-                          setAddressModalOpen(true);
-                        }}
-                        className="w-full py-2.5 rounded-full border border-[#E3C9A8] text-xs font-medium tracking-wider uppercase text-[#3D2B1F] hover:bg-white transition-colors"
-                      >
-                        Modify Shipping Address
-                      </button>
-                    </div>
+                    <h2
+                      className="text-2xl sm:text-3xl font-normal text-[#2A1E17] tracking-wider mt-1"
+                      style={{ fontFamily: "'Cinzel', serif" }}
+                    >
+                      Addresses
+                    </h2>
+                    <p className="text-xs sm:text-sm text-[#7A6B5D] mt-1.5">
+                      Maintain up to 3 saved destinations with custom tags (Default, Home, Others) for express checkout.
+                    </p>
                   </div>
 
-                  {/* Billing Address Card */}
-                  <div className="bg-[#FFFAF5] rounded-2xl border border-[#E3C9A8]/60 p-6 flex flex-col justify-between shadow-sm">
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-[#FEF5EC] border border-[#E3C9A8]/60 text-[#C4896A]">
-                          Billing Coordinates
-                        </span>
-
-                        <button
-                          onClick={() => {
-                            setAddressModalType("billing");
-                            setAddressModalOpen(true);
-                          }}
-                          className="text-xs font-medium text-[#3D2B1F] hover:text-[#C4896A] underline transition-colors"
-                        >
-                          Edit
-                        </button>
-                      </div>
-
-                      <h4
-                        className="text-base font-semibold text-[#2A1E17] mb-2"
-                        style={{ fontFamily: "'Cinzel', serif" }}
-                      >
-                        Invoice & Statement Coordinates
-                      </h4>
-
-                      <div className="space-y-1.5 text-xs text-[#7A6B5D] leading-relaxed">
-                        <p className="font-medium text-[#2A1E17]">{billingAddress.name}</p>
-                        <p>{billingAddress.street}</p>
-                        <p>
-                          {billingAddress.city}, {billingAddress.state} {billingAddress.postalCode}
-                        </p>
-                        <p>{billingAddress.country}</p>
-                        <p className="pt-2 text-[#C4896A]">Phone: {billingAddress.phone}</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 mt-6 border-t border-[#E3C9A8]/30">
-                      <button
-                        onClick={() => {
-                          setAddressModalType("billing");
-                          setAddressModalOpen(true);
-                        }}
-                        className="w-full py-2.5 rounded-full border border-[#E3C9A8] text-xs font-medium tracking-wider uppercase text-[#3D2B1F] hover:bg-white transition-colors"
-                      >
-                        Modify Billing Address
-                      </button>
-                    </div>
-                  </div>
+                  {addresses.length < MAX_SAVED_ADDRESSES ? (
+                    <button
+                      onClick={() => {
+                        setEditingAddress(null);
+                        setAddressModalOpen(true);
+                      }}
+                      className="px-6 py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-wider uppercase transition-all duration-300 shadow-sm flex items-center gap-2 flex-shrink-0"
+                    >
+                      <span>+ Add New Address</span>
+                    </button>
+                  ) : (
+                    <span className="px-4 py-2 rounded-full bg-[#FEF5EC] border border-[#E3C9A8]/80 text-[#C4896A] text-xs font-medium uppercase tracking-wider flex-shrink-0">
+                      Limit of 3 Saved Addresses
+                    </span>
+                  )}
                 </div>
+
+                {loadingAddresses ? (
+                  <div className="py-16 text-center text-xs text-[#7A6B5D]">
+                    <div className="w-6 h-6 border-2 border-[#C4896A]/30 border-t-[#C4896A] rounded-full animate-spin mx-auto mb-2" />
+                    <span>Accessing patron delivery book...</span>
+                  </div>
+                ) : addresses.length === 0 ? (
+                  <div className="text-center py-16 px-6 bg-[#FFFAF5] rounded-2xl border border-[#E3C9A8]/40">
+                    <div className="w-16 h-16 rounded-full bg-[#FEF5EC] border border-[#E3C9A8] text-[#C4896A] flex items-center justify-center mx-auto mb-4 text-2xl">
+                      📍
+                    </div>
+                    <h3
+                      className="text-lg font-normal text-[#2A1E17] tracking-wider mb-2"
+                      style={{ fontFamily: "'Cinzel', serif" }}
+                    >
+                      No Saved Addresses Yet
+                    </h3>
+                    <p className="text-xs sm:text-sm text-[#7A6B5D] max-w-md mx-auto">
+                      Keep up to 3 delivery destinations (Default, Home, Others) for expedited courier shipping and streamlined checkout.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {addresses.map((addr) => {
+                      const isDefault = addr.tag === "Default";
+                      return (
+                        <div
+                          key={addr.id}
+                          className="bg-[#FFFAF5] rounded-2xl border border-[#E3C9A8]/60 p-6 flex flex-col justify-between shadow-sm hover:border-[#C4896A] hover:shadow-md transition-all duration-300"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase ${
+                                  addr.tag === "Default"
+                                    ? "bg-[#3D2B1F] text-[#E3C9A8] shadow-sm"
+                                    : addr.tag === "Home"
+                                    ? "bg-[#FEF5EC] border border-[#E3C9A8]/80 text-[#C4896A]"
+                                    : "bg-[#FFFFFF] border border-[#E3C9A8]/70 text-[#7A6B5D]"
+                                }`}
+                              >
+                                {addr.tag === "Default" ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+                                ) : addr.tag === "Home" ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                                )}
+                                <span>{addr.tag}</span>
+                              </span>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingAddress(addr);
+                                    setAddressModalOpen(true);
+                                  }}
+                                  className="px-3.5 py-1.5 rounded-full border border-[#E3C9A8] bg-[#FFFFFF] hover:bg-[#3D2B1F] text-[#3D2B1F] hover:text-[#E3C9A8] hover:border-[#3D2B1F] text-xs font-medium tracking-wider uppercase transition-all duration-200 shadow-sm flex items-center gap-1.5"
+                                  title="Update address"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                  <span>Update</span>
+                                </button>
+                                <button
+                                  onClick={() => setAddressToDelete(addr)}
+                                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#7A6B5D] hover:text-[#B91C1C] hover:bg-[#FEF2F2] border border-transparent hover:border-[#FCA5A5]/60 transition-all duration-200"
+                                  title="Remove address"
+                                  aria-label="Remove address"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="3 6 5 6 21 6" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+
+                            <h4
+                              className="text-base font-semibold text-[#2A1E17] mb-2"
+                              style={{ fontFamily: "'Cinzel', serif" }}
+                            >
+                              {addr.firstName} {addr.lastName}
+                            </h4>
+
+                            <div className="space-y-1 text-xs text-[#7A6B5D] leading-relaxed">
+                              <p className="text-[#3D2B1F] font-medium">{addr.street}</p>
+                              <p>{addr.city}, {addr.state} {addr.postalCode}</p>
+                              <p>{addr.country}</p>
+                              <p className="pt-2 text-[#C4896A] font-medium flex items-center gap-1.5">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+                                <span>{addr.phone}</span>
+                              </p>
+                              <p className="text-[#A8988B] text-[11px] truncate flex items-center gap-1.5">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+                                <span>{addr.email}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-5 mt-5 border-t border-[#E3C9A8]/30">
+                            {!isDefault ? (
+                              <button
+                                onClick={() => handleSetDefaultAddress(addr)}
+                                className="w-full py-2 rounded-xl border border-[#E3C9A8] text-[11px] font-medium tracking-wider uppercase text-[#3D2B1F] hover:bg-white hover:border-[#C4896A] transition-colors"
+                              >
+                                Set as Default
+                              </button>
+                            ) : (
+                              <div className="text-[11px] font-medium text-[#C4896A] flex items-center justify-center gap-1.5 py-1">
+                                <span>✦</span>
+                                <span>Primary Checkout Destination</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1450,42 +1408,103 @@ export default function MyAccount() {
           </main>
         </div>
 
-        {/* Mobile View Bottom Action Bar (Dual access per user request) */}
-        <div className="mt-12 pt-6 border-t border-[#E3C9A8]/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs text-[#7A6B5D]">
-            <span className="text-[#C4896A]">✦</span>
-            <span>The Handmade Vendor Atelier • Private Patron Area</span>
-          </div>
-
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Link
-              href="/shop"
-              className="flex-1 sm:flex-initial text-center px-6 py-2.5 rounded-full border border-[#E3C9A8] text-xs font-medium tracking-wider uppercase text-[#3D2B1F] hover:bg-white hover:border-[#C4896A] transition-colors shadow-sm"
-            >
-              Explore Atelier
-            </Link>
-
-            <button
-              onClick={handleSignOut}
-              className="flex-1 sm:flex-initial text-center px-6 py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-sm flex items-center justify-center gap-1.5"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Address Edit Modal */}
       <AddressModal
         isOpen={addressModalOpen}
-        closeModal={() => setAddressModalOpen(false)}
-        addressType={addressModalType}
-        initialData={addressModalType === "shipping" ? shippingAddress : billingAddress}
-        onSave={handleAddressSave}
+        closeModal={() => {
+          setAddressModalOpen(false);
+          setEditingAddress(null);
+        }}
+        initialData={editingAddress}
+        onSave={handleSaveAddress}
+        isFirstAddress={addresses.length === 0}
+        usedTags={usedTags}
       />
+
+      {/* Delete Address Warning Confirmation Popup */}
+      {addressToDelete && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center px-4 py-6 bg-[#2A1E17]/65 backdrop-blur-sm transition-opacity duration-300">
+          <div className="relative w-full max-w-md bg-[#FFFFFF] rounded-3xl border border-[#E3C9A8]/70 shadow-[0_24px_60px_rgba(42,30,23,0.28)] p-6 sm:p-8 text-[#3D2B1F] animate-in fade-in zoom-in-95 duration-200">
+            {/* Close button with hover circle */}
+            <button
+              onClick={() => setAddressToDelete(null)}
+              type="button"
+              aria-label="Close dialog"
+              className="absolute top-4 right-4 sm:top-5 sm:right-5 w-8 h-8 rounded-full flex items-center justify-center text-[#7A6B5D] hover:text-[#3D2B1F] hover:bg-[#FFFAF5] border border-transparent hover:border-[#E3C9A8]/50 transition-all duration-200"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Warning Icon */}
+            <div className="w-14 h-14 rounded-full bg-[#FEF2F2] border border-[#FCA5A5]/60 text-[#B91C1C] flex items-center justify-center mx-auto mb-4 shadow-sm">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </div>
+
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-[#FEF2F2] text-[#B91C1C] border border-[#FCA5A5]/60 mb-2">
+                <span>Confirm Removal</span>
+              </div>
+              <h3
+                className="text-xl sm:text-2xl font-normal text-[#2A1E17] tracking-wider mb-2"
+                style={{ fontFamily: "'Cinzel', serif" }}
+              >
+                Remove Destination?
+              </h3>
+              <p className="text-xs text-[#7A6B5D] leading-relaxed">
+                Are you sure you want to remove the{" "}
+                <span className="font-semibold text-[#3D2B1F]">"{addressToDelete.tag}"</span> destination for{" "}
+                <span className="font-semibold text-[#3D2B1F]">{addressToDelete.firstName} {addressToDelete.lastName}</span>?
+              </p>
+              <div className="mt-3 p-3 bg-[#FFFAF5] rounded-xl border border-[#E3C9A8]/40 text-left text-xs text-[#7A6B5D]">
+                <p className="text-[#3D2B1F] font-medium">{addressToDelete.street}</p>
+                <p>{addressToDelete.city}, {addressToDelete.state} {addressToDelete.postalCode}</p>
+                <p>{addressToDelete.country}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-[#E3C9A8]/30">
+              <button
+                type="button"
+                onClick={() => setAddressToDelete(null)}
+                disabled={deletingAddress}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-full border border-[#E3C9A8] text-xs font-medium tracking-wider uppercase text-[#3D2B1F] hover:bg-[#FFFAF5] hover:border-[#C4896A] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteAddress(addressToDelete.id)}
+                disabled={deletingAddress}
+                className="w-full sm:w-auto px-7 py-2.5 rounded-full bg-[#B91C1C] hover:bg-[#991B1B] text-[#FFFFFF] text-xs font-semibold tracking-wider uppercase transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2 border border-[#991B1B]"
+              >
+                {deletingAddress ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                    <span>Remove Address</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

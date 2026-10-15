@@ -50,6 +50,24 @@
     - [Collapsible Slide-Over Drawer & Expandable Desktop Sidebar](#collapsible-slide-over-drawer--expandable-desktop-sidebar)
     - [Product Card Luxury Architecture & Quick Actions](#product-card-luxury-architecture--quick-actions)
     - [Deprecation of `/shop-without-sidebar`](#deprecation-of-shop-without-sidebar)
+14. [Atelier Patron Portal (`/my-account`) Remake](#14-atelier-patron-portal-my-account-remake)
+    - [Aesthetic & Visual Identity](#aesthetic--visual-identity)
+    - [Collapsible Luxury Sidebar & Responsive Navigation](#collapsible-luxury-sidebar--responsive-navigation)
+    - [Installed UI Component Libraries](#installed-ui-component-libraries)
+    - [Functional Sections & Features](#functional-sections--features)
+15. [Patron Address Book, Route Protection & State Synchronization](#15-patron-address-book-route-protection--state-synchronization)
+    - [PostgreSQL Schema & Migration Idempotency](#postgresql-schema--migration-idempotency)
+    - [Address Tag Swapping & Single Default Enforcement](#address-tag-swapping--single-default-enforcement)
+    - [Auto-Healing Database Sanitization](#auto-healing-database-sanitization)
+    - [Cascading Dropdowns & Atelier UX Enhancements](#cascading-dropdowns--atelier-ux-enhancements)
+    - [Destructive Action Confirmation Modal & High-Contrast Luxury Theme](#destructive-action-confirmation-modal--high-contrast-luxury-theme)
+    - [Multi-Tier Route Protection Architecture (`/my-account`)](#multi-tier-route-protection-architecture-my-account)
+    - [Post-Sign-In Redirection Flow](#post-sign-in-redirection-flow)
+16. [Daily Work Updates & Engineering Changelog (October 15–16, 2026)](#16-daily-work-updates--engineering-changelog-october-1516-2026)
+    - [Summary of Completed Tasks & Objectives](#summary-of-completed-tasks--objectives)
+    - [Architecture & Implementation Highlights](#architecture--implementation-highlights)
+    - [Key Bug Fixes & Edge Case Solutions](#key-bug-fixes--edge-case-solutions)
+    - [Verification, Build & Test Results](#verification-build--test-results)
 
 ---
 
@@ -752,5 +770,281 @@ The platform implements an optimistic, non-blocking synchronization pipeline con
 
 ---
 
+## 15. Patron Address Book, Route Protection & State Synchronization
+
+### Overview
+A comprehensive, luxury address management and route security architecture designed for up to 3 saved delivery destinations with unique tags (`Default`, `Home`, `Others`), full PostgreSQL persistence via Supabase with offline `localStorage` fallback, triple-tier route protection, and high-contrast luxury styling.
+
+---
+
+### PostgreSQL Schema & Migration Idempotency
+- **Migration File**: `supabase/migrations/20261015_create_user_addresses.sql`
+- **Schema Columns**:
+  - `id`: UUID primary key with `gen_random_uuid()` default.
+  - `user_id`: UUID foreign key referencing `auth.users(id)` with `on delete cascade`.
+  - `first_name`, `last_name`: Separated patron name fields for shipping labels and formal courier invoicing.
+  - `email`: Mandatory notification contact email (`text not null`) with validation regex for automated shipping notifications.
+  - `phone`, `street`, `city`, `state`, `postal_code`, `country`: Complete destination coordinates.
+  - `country_code`, `state_code`: ISO country and province codes for carrier integration.
+  - `tag`: Checked text constraint (`check (tag in ('Default', 'Home', 'Others'))`).
+  - `is_default`: Boolean flag indicating primary checkout destination.
+  - `created_at`, `updated_at`: Timestamp tracking.
+- **Idempotent Migration Structure**:
+  To resolve PostgreSQL error `42710: policy "Allow users to view own addresses" for table "user_addresses" already exists` during repeated migrations, explicit cascading drop queries were integrated:
+  ```sql
+  -- Drop previous table if exists to start clean and prevent policy duplicate errors
+  drop table if exists public.user_addresses cascade;
+
+  -- Explicit policy cleanups
+  drop policy if exists "Allow users to view own addresses" on public.user_addresses;
+  drop policy if exists "Allow users to insert own addresses" on public.user_addresses;
+  drop policy if exists "Allow users to update own addresses" on public.user_addresses;
+  drop policy if exists "Allow users to delete own addresses" on public.user_addresses;
+  ```
+
+---
+
+### Address Tag Swapping & Single Default Enforcement
+- **Root Problem Identified**:
+  Prior implementations hardcoded `"Home"` whenever an address was marked as Default, resulting in duplicate `"Home"` tags when an `"Others"` card was promoted. Furthermore, saving only the active card to Supabase left other cards marked as `Default`, leading to all cards displaying as `"Default"` upon page reload.
+- **Architectural Resolution (`src/utils/addressSync.ts`)**:
+  - **Atomic Tag Swapping (`setDefaultAddress`)**:
+    When an address (e.g., tagged `"Others"`) is promoted to `"Default"`, the former Default address cleanly inherits the promoted address's previous tag (`"Others"`).
+    ```ts
+    const targetOldTag: AddressTag = target.tag;
+    const oldDefaultIndex = current.findIndex((a) => a.tag === "Default" || a.isDefault);
+
+    const updatedList = current.map((item, idx) => {
+      if (idx === targetIndex) return { ...item, tag: "Default", isDefault: true };
+      if (idx === oldDefaultIndex) return { ...item, tag: targetOldTag, isDefault: false };
+      return { ...item, isDefault: false };
+    });
+    ```
+  - **Batch Synchronization (`syncAllToSupabase`)**:
+    All 3 addresses are upserted together in a single batch operation so that PostgreSQL and local state remain synchronized simultaneously.
+  - **Single Source of Truth**:
+    Card presentation strictly maps default state to `addr.tag === "Default"`, eliminating state discrepancies between `tag` and `isDefault`.
+  - **Dynamic In-Use Tag Disabling (`AddressModal.tsx`)**:
+    The modal receives `usedTags: AddressTag[]` from the parent component. Any tag already assigned to another address is disabled with an `(in use)` indicator and muted styling, preventing patrons from duplicating tags.
+
+---
+
+### Auto-Healing Database Sanitization
+- **Self-Healing Routine (`sanitizeAddressTags`)**:
+  Automatically executed inside `getSavedAddresses()`.
+  If historical records contain duplicate tags or multiple defaults:
+  1. Identifies the primary Default address.
+  2. Scans other addresses and reassigns unique available tags from `["Home", "Others"]`.
+  3. Reconciles `isDefault` strictly with `tag === "Default"`.
+  4. If repairs were needed (`changed: true`), immediately persists the sanitized data back to Supabase and caches it in `localStorage`.
+
+---
+
+### Cascading Dropdowns & Atelier UX Enhancements
+- **Clean Dropdowns without ISO Codes**:
+  Integrated `country-state-city` with `AtelierDropdown`. Removed ISO codes from label displays to maintain a clean, luxury presentation showing only country/state names and national flags.
+- **Dropdown Scroll Bleed Elimination**:
+  Restructured `AtelierDropdown.tsx` as a fixed-header flex-column container (`flex flex-col max-h-64`) with an independent scrollable item list (`overflow-y-auto no-scrollbar`), preventing items from bleeding behind the search input during scrolling.
+- **"Update" Action Button**:
+  Replaced plain underlined text links with a styled, circular-bordered pill button (`rounded-full border border-[#E3C9A8] bg-[#FFFFFF] hover:bg-[#3D2B1F] text-[#3D2B1F] hover:text-[#E3C9A8]`) with an edit icon.
+- **Global Toast Validation**:
+  Replaced inline form error alerts with `showToast.error(...)` notifications, providing unified, elegant feedback across all devices.
+
+---
+
+### Destructive Action Confirmation Modal & High-Contrast Luxury Theme
+- **Hover Circle Action**:
+  The address card delete button includes a circular hover ring (`w-8 h-8 rounded-full hover:text-[#B91C1C] hover:bg-[#FEF2F2] hover:border-[#FCA5A5]/60 transition-all duration-200`) consistent with site-wide patterns.
+- **Delete Warning Confirmation Modal**:
+  Triggering delete presents an animated modal displaying:
+  - Destructive Warning Badge with SVG trash icon.
+  - Address tag, recipient name, and formatted destination coordinates.
+  - "Cancel" button and "Remove Address" action button.
+- **Tailwind Palette Fix**:
+  Because `tailwind.config.ts` overrides default theme colors without extending numeric scales (e.g., `bg-red-600`), the confirmation button and warning badges were updated to explicit luxury crimson hex values:
+  - Button: `bg-[#B91C1C] hover:bg-[#991B1B] text-[#FFFFFF] border border-[#991B1B] shadow-md`
+  - Warning Badge: `bg-[#FEF2F2] border border-[#FCA5A5]/60 text-[#B91C1C]`
+- **Automatic Default Promotion on Delete**:
+  If a patron deletes their `"Default"` destination and other addresses exist, the first remaining address is automatically promoted to `"Default"` and synchronized with Supabase.
+
+---
+
+### Multi-Tier Route Protection Architecture (`/my-account`)
+Access to `/my-account` is secured via 3 independent defensive layers:
+
+```
+[Incoming Request to /my-account]
+              │
+              ▼
+   ┌────────────────────────────────────────┐
+   │ 1. Next.js Proxy/Middleware Layer      │
+   │    src/utils/supabase/middleware.ts    │ ──► Unauthenticated? ──► Redirect 307 to /signin?redirect=/my-account
+   └────────────────────────────────────────┘
+              │ (Authenticated)
+              ▼
+   ┌────────────────────────────────────────┐
+   │ 2. Server Component Layer              │
+   │    src/app/(site)/(pages)/my-account   │ ──► Unauthenticated? ──► Server redirect("/signin?redirect=/my-account")
+   └────────────────────────────────────────┘
+              │ (Renders)
+              ▼
+   ┌────────────────────────────────────────┐
+   │ 3. Client Verification & Session Gate  │
+   │    src/components/MyAccount/index.tsx   │ ──► Session Lost?   ──► router.replace("/signin?redirect=/my-account")
+   └────────────────────────────────────────┘
+```
+
+1. **Proxy / Middleware Layer (`src/utils/supabase/middleware.ts` & `src/proxy.ts`)**:
+   Runs on Edge/Node on all non-static asset paths. Inspects `supabase.auth.getUser()`. If no active session exists and path starts with `/my-account`, returns `NextResponse.redirect('/signin?redirect=/my-account')`.
+2. **Server Component Layer (`src/app/(site)/(pages)/my-account/page.tsx`)**:
+   An async server component calling `createClient()` from `@/utils/supabase/server`. If `!user`, calls Next.js `redirect("/signin?redirect=/my-account")` to eliminate any SSR HTML leakage.
+3. **Client Component Layer (`src/components/MyAccount/index.tsx`)**:
+   During client-side mounting and hydration, `loadUser()` validates credentials. While validating, renders a sleek luxury verification loader (`"Verifying Patron Credentials..."`). If credentials fail, triggers `router.replace("/signin?redirect=/my-account")`.
+
+---
+
+### Post-Sign-In Redirection Flow
+- **Files**:
+  - `src/components/Auth/Signin/index.tsx`
+  - `src/app/(site)/(pages)/signin/page.tsx`
+  - `src/app/auth/callback/route.ts`
+- **Behavior**:
+  - `Signin` reads `useSearchParams().get("redirect") || "/my-account"` within a `<Suspense>` boundary.
+  - On email/password authentication success: navigates directly to `redirectUrl`.
+  - On Google OAuth: constructs OAuth callback URL with `?next=${encodeURIComponent(redirectUrl)}`, allowing `auth/callback/route.ts` to redirect patrons directly back to their intended destination.
+
+---
+
+## 16. Daily Work Updates & Engineering Changelog (October 15–16, 2026)
+
+### Summary of Completed Tasks & Objectives
+Today's development session focused on elevating the **Atelier Patron Portal (`/my-account`)** to full production luxury standards, resolving critical data synchronization bugs in the Address Book, making database migrations idempotent, securing patron accounts via multi-tier route protection, and ensuring consistent user experiences across mobile and desktop viewports:
+
+1. **Enterprise UI Library Integrations**:
+   - Integrated `@headlessui/react` for accessible, searchable, keyboard-navigable luxury dropdowns (`AtelierDropdown`).
+   - Integrated `@tanstack/react-table` for sortable, paginated data ledgers and acquisition records (`AtelierTable`).
+   - Integrated `country-state-city` for cascading geographic data across 250+ countries, states, and municipal cities.
+
+2. **Atelier Patron Portal Layout & Decluttering**:
+   - Removed the redundant top Atelier Patron Portal banner.
+   - Removed email display from the profile headbox to maintain privacy and a clean aesthetic.
+   - Placed both **[Explore Atelier]** and **[Sign Out]** buttons at the top banner and page footer in mobile view for effortless one-tap navigation.
+   - Configured the Atelier sidebar to be closed initially by default (compact 84px icon rail with hover tooltips), expandable on patron interaction.
+   - Replaced mobile horizontal slider buttons with a unified `AtelierDropdown` section selector.
+   - Eliminated nested `<button>` tags to resolve Next.js/React hydration warnings.
+
+3. **Curated Wishlist Parity & Real-Time Sync**:
+   - Replaced custom cards with the official storefront `@/components/Common/ProductItem` cards used in `/shop-with-sidebar` and the homepage (`BestSeller`/`NewArrivals`).
+   - Full Swiper gallery integration, quick view modals, and star ratings.
+   - Real-time two-way synchronization: removing items or moving items to the shopping bag reconciles across Redux in-memory state, browser IndexedDB (`TheHandmadeVendorDB`), and Supabase PostgreSQL.
+
+4. **Patron Address Book System**:
+   - Enforced initial empty state for all users (prompting `+ Add Delivery Address`).
+   - Supported up to 3 addresses with unique tags: `Default`, `Home`, and `Others`.
+   - Enhanced modal form: split First Name and Last Name, mandatory Email with validation, Phone, Street, Country, State, City, Postal Code.
+   - Upgraded to an artisan-styled architectural home icon matching brand geometry.
+   - Cascading dropdowns (Country ──► State ──► City) with automatic reset and clean display names (ISO country/state codes hidden).
+   - Fixed dropdown search bleed bug by isolating the scrollable item container from the sticky search bar.
+   - Dynamic tag disabling: tags already assigned to another address are disabled in the selection picker with an `(in use)` indicator.
+   - Replaced raw text "Edit" links with a luxury styled "Update" pill button.
+   - Circular hover rings on destructive delete buttons.
+
+5. **Critical Address Bug Fixes**:
+   - **Tag Swapping Invariant**: Resolved bug where promoting an address to "Default" caused the former default card to hardcode to "Home" instead of cleanly inheriting the promoted card's previous tag (e.g., "Others").
+   - **Reload Multi-Default Persistence**: Resolved bug where promoting multiple addresses sequentially caused all cards to display as "Default" after page refresh. Solved via atomic batch upserting (`syncAllToSupabase`) and auto-healing data sanitization (`sanitizeAddressTags`).
+   - **Tailwind Palette Crimson Contrast**: Fixed invisible/washed-out confirm delete buttons caused by Tailwind config overriding default colors. Switched to explicit luxury crimson hex values (`#B91C1C` button, `#FEF2F2` background, `#FCA5A5`/60 border).
+   - **Automated Default Promotion**: Deleting a "Default" address automatically promotes the first remaining saved address to "Default" and synchronizes with Supabase.
+
+6. **PostgreSQL Migration Idempotency (Error 42710 Resolution)**:
+   - Added cascading table drop (`DROP TABLE IF EXISTS public.user_addresses CASCADE;`) and explicit policy drop statements in `supabase/migrations/20261015_create_user_addresses.sql` to prevent duplicate policy errors when re-executing migrations.
+
+7. **Multi-Tier Protected Route & Post-Sign-In Redirect**:
+   - Protected `/my-account` across Edge proxy/middleware, Next.js server components, and client-side auth state listeners.
+   - Unauthenticated visitors are redirected to `/signin?redirect=/my-account`.
+   - Updated `Signin` component with `<Suspense>` boundary and query param reader to seamlessly return patrons to `/my-account` upon authentication (supporting both password logins and Google OAuth via PKCE).
+
+---
+
+### Architecture & Implementation Highlights
+
+#### Module Matrix
+
+| File / Component | Primary Responsibilities & Architectural Role | Key Functions / Elements |
+| :--- | :--- | :--- |
+| `src/utils/addressSync.ts` | Complete client-cloud address orchestration layer. Handles Supabase CRUD, local storage caching, auto-healing sanitization, and atomic batch syncs. | `getSavedAddresses`, `saveAddress`, `setDefaultAddress`, `deleteAddress`, `sanitizeAddressTags`, `syncAllToSupabase` |
+| `src/components/MyAccount/AddressModal.tsx` | Responsive luxury address form modal. Features cascading country/state/city selectors (`country-state-city`), mandatory email validation, and tag disabling. | `usedTags` prop, `showToast.error`, dynamic tag selection pills, `Country.getAllCountries` |
+| `src/components/Common/AtelierDropdown.tsx` | Headless UI dropdown wrapper. Features search bar isolation, keyboard navigation, and custom luxury styling with scroll bleed prevention. | Fixed header container, `overflow-y-auto no-scrollbar`, label search filtering |
+| `src/components/MyAccount/index.tsx` | Main Atelier Patron Portal container. Hosts collapsible sidebar, order history table, curated wishlist grid, and address cards. | `setDefaultAddress`, Delete confirmation modal with `#B91C1C` styling, "Update" button, dual action buttons |
+| `supabase/migrations/20261015_create_user_addresses.sql` | Idempotent PostgreSQL schema migration for user addresses, complete with RLS policies and cascading drops. | `user_addresses` table, foreign key to `auth.users`, RLS policies, trigger on `updated_at` |
+| `src/utils/supabase/middleware.ts` & `src/proxy.ts` | Next.js 16 Edge proxy layer guarding protected routes before server rendering begins. | Intercepts `/my-account`, returns `NextResponse.redirect` if unauthenticated |
+| `src/app/(site)/(pages)/my-account/page.tsx` | Server component checking active session with cookies, eliminating HTML leakage for unauthenticated users. | Server-side `redirect("/signin?redirect=/my-account")` |
+| `src/components/Auth/Signin/index.tsx` | Luxury sign-in interface supporting credentials and Google OAuth, reading `redirect` parameter via `<Suspense>`. | Redirects to intended destination upon successful login |
+
+---
+
+### Key Bug Fixes & Edge Case Solutions
+
+#### 1. Address Tag Swapping Logic
+- **Problem**: When a user had 3 addresses tagged `Default`, `Home`, and `Others`, clicking "Set as Default" on the `Others` card resulted in two cards tagged `Home` (because the previous default card was arbitrarily hardcoded to `Home`).
+- **Solution**: Implemented symmetrical tag swapping in `setDefaultAddress`:
+  ```ts
+  const targetOldTag: AddressTag = target.tag; // "Others"
+  const oldDefaultIndex = current.findIndex((a) => a.tag === "Default" || a.isDefault);
+
+  const updatedList = current.map((item, idx) => {
+    if (idx === targetIndex) return { ...item, tag: "Default", isDefault: true };
+    if (idx === oldDefaultIndex) return { ...item, tag: targetOldTag, isDefault: false }; // Inherits "Others"
+    return { ...item, isDefault: false };
+  });
+  ```
+
+#### 2. Multi-Default Reload Bug & Atomic Batch Upserts
+- **Problem**: When a user clicked "Set as Default" on card 2 and then card 3, only the newly promoted card was updated in PostgreSQL. The previous cards retained `is_default = true` in the database. Upon page reload, all cards loaded with `Default` badges.
+- **Solution**:
+  - Implemented `syncAllToSupabase()` which performs a single atomic upsert of all 3 addresses with their current, mutually exclusive `is_default` flags and tags.
+  - Implemented `sanitizeAddressTags()` which runs automatically on initial load. If duplicate defaults or tags are detected, it self-heals by assigning unique tags and updating both the cloud database and `localStorage`.
+
+#### 3. High-Contrast Luxury Crimson Delete Button
+- **Problem**: In `tailwind.config.ts`, `theme.colors` directly defined the color object without `extend`. Standard utility classes like `bg-red-600` and `bg-red-50` were compiled as transparent or non-existent, causing the confirmation button text and background to look broken.
+- **Solution**: Replaced all Tailwind red scale classes with explicit hex tokens matching the brand's luxury crimson palette:
+  - Button: `bg-[#B91C1C] hover:bg-[#991B1B] text-[#FFFFFF] border border-[#991B1B] shadow-md`
+  - Modal Warning Circle: `bg-[#FEF2F2] border border-[#FCA5A5]/60 text-[#B91C1C]`
+
+#### 4. PostgreSQL Error 42710 (Policy Already Exists)
+- **Problem**: Running migration `20261015_create_user_addresses.sql` repeatedly in Supabase SQL editor failed with:
+  `ERROR: 42710: policy "Allow users to view own addresses" for table "user_addresses" already exists`
+- **Solution**: Added explicit drop statements prior to policy creation:
+  ```sql
+  drop table if exists public.user_addresses cascade;
+  drop policy if exists "Allow users to view own addresses" on public.user_addresses;
+  drop policy if exists "Allow users to insert own addresses" on public.user_addresses;
+  drop policy if exists "Allow users to update own addresses" on public.user_addresses;
+  drop policy if exists "Allow users to delete own addresses" on public.user_addresses;
+  ```
+
+#### 5. Dropdown Scroll Bleed
+- **Problem**: In `AtelierDropdown`, scrolling through long lists of countries or states caused list items to visibly scroll behind the search input, creating an unprofessional overlapping effect.
+- **Solution**: Restructured the component into a two-tier flex container:
+  1. Sticky top header containing the search input (`p-2.5 border-b border-[#E3C9A8]/50 bg-[#FFFAF5]`).
+  2. Isolated scrollable viewport beneath the header (`flex-1 overflow-y-auto no-scrollbar max-h-48`).
+
+---
+
+### Verification, Build & Test Results
+
+- **Next.js Production Build**:
+  - Ran `npx next build` via terminal.
+  - Result: **Compiled successfully in 7.4s**. Zero TypeScript or lint errors.
+  - Route `/my-account` correctly marked as `ƒ (Dynamic)` with zero prerender leakage.
+- **Interactive Browser Verification**:
+  - Address tag disabling: verified that assigned tags display as disabled with `(in use)`.
+  - Tag swapping: verified that setting an `Others` address to `Default` cleanly turns the previous default into `Others`.
+  - Persistence test: toggled defaults across all 3 addresses, reloaded page (`F5`), verified only 1 card remained `Default`.
+  - Deletion flow: verified warning modal displays with high-contrast crimson `#B91C1C` button, and confirmed deletion auto-promotes remaining card to `Default`.
+  - Protected route: navigated to `http://localhost:3000/my-account` while unauthenticated; verified immediate redirect to `http://localhost:3000/signin?redirect=%2Fmy-account`.
+
+---
+
 *Documentation maintained for The Handmade Vendor repository.*
+
 

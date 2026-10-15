@@ -2,12 +2,15 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { showToast } from "@/utils/toast";
 
 const Signin = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/my-account";
+
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +40,7 @@ const Signin = () => {
       }
 
       showToast.success("Welcome back to the Atelier!");
-      router.push("/");
+      router.push(redirectUrl);
       router.refresh();
     } catch (err: any) {
       showToast.error(err.message || "Failed to sign in.");
@@ -49,10 +52,14 @@ const Signin = () => {
     setIsGoogleLoading(true);
     try {
       const supabase = createClient();
+      const callbackUrl = redirectUrl
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
+        : `${window.location.origin}/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
       if (error) {
