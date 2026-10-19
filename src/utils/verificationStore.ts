@@ -119,3 +119,109 @@ export const verificationStore = {
     return record;
   },
 };
+
+interface PasswordResetRecord {
+  email: string;
+  code: string;
+  createdAt: number;
+  expiresAt: number;
+  attempts: number;
+}
+
+declare global {
+  var __passwordResetStore: Map<string, PasswordResetRecord> | undefined;
+}
+
+const resetStore =
+  global.__passwordResetStore || new Map<string, PasswordResetRecord>();
+if (process.env.NODE_ENV !== "production") {
+  global.__passwordResetStore = resetStore;
+}
+
+const RESET_CODE_LIFETIME_MS = 10 * 60 * 1000; // 10 minutes
+
+export const passwordResetStore = {
+  createReset(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = resetStore.get(normalizedEmail);
+
+    // Rate-limiting check: 60s cooldown
+    if (existing && Date.now() - existing.createdAt < RESEND_COOLDOWN_MS) {
+      const waitSeconds = Math.ceil(
+        (RESEND_COOLDOWN_MS - (Date.now() - existing.createdAt)) / 1000
+      );
+      throw new Error(`Please wait ${waitSeconds} seconds before requesting a new code.`);
+    }
+
+    const code = crypto.randomInt(100000, 999999).toString();
+    const now = Date.now();
+
+    const record: PasswordResetRecord = {
+      email: normalizedEmail,
+      code,
+      createdAt: now,
+      expiresAt: now + RESET_CODE_LIFETIME_MS,
+      attempts: 0,
+    };
+
+    resetStore.set(normalizedEmail, record);
+    return { code, expiresAt: record.expiresAt };
+  },
+
+  verifyReset(email: string, codeInput: string, consume: boolean = false) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const record = resetStore.get(normalizedEmail);
+
+    if (!record) {
+      return {
+        success: false,
+        error: "No active recovery code found for this email. Please request a new code.",
+      };
+    }
+
+    if (Date.now() > record.expiresAt) {
+      resetStore.delete(normalizedEmail);
+      return {
+        success: false,
+        error: "Recovery code has expired (10-minute limit exceeded). Please request a new code.",
+      };
+    }
+
+    record.attempts += 1;
+    if (record.attempts > MAX_ATTEMPTS) {
+      resetStore.delete(normalizedEmail);
+      return {
+        success: false,
+        error: "Maximum verification attempts exceeded. Please request a new code.",
+      };
+    }
+
+    if (record.code !== codeInput.trim()) {
+      const remainingAttempts = MAX_ATTEMPTS - record.attempts;
+      return {
+        success: false,
+        error: `Invalid recovery code. ${remainingAttempts} attempts remaining.`,
+      };
+    }
+
+    if (consume) {
+      resetStore.delete(normalizedEmail);
+    }
+
+    return {
+      success: true,
+    };
+  },
+
+  getReset(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const record = resetStore.get(normalizedEmail);
+    if (!record) return null;
+    if (Date.now() > record.expiresAt) {
+      resetStore.delete(normalizedEmail);
+      return null;
+    }
+    return record;
+  },
+};
+

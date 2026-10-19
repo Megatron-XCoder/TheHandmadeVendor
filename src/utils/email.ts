@@ -227,3 +227,221 @@ export async function sendWelcomeEmail({
   return { success: true, simulated: false };
 }
 
+interface SendPasswordResetEmailOptions {
+  email: string;
+  resetUrl: string;
+  code?: string;
+  firstName?: string;
+}
+
+export async function sendPasswordResetEmail({
+  email,
+  resetUrl,
+  code,
+  firstName,
+}: SendPasswordResetEmailOptions) {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from =
+    process.env.SMTP_FROM ||
+    `"The Handmade Vendor Concierge" <concierge@thehandmadevendor.com>`;
+
+  const displayName = firstName?.trim() || "Valued Patron";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Atelier Credential Recovery</title>
+      <style>
+        body { margin: 0; padding: 0; background-color: #FFFAF5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #3D2B1F; }
+        .wrapper { max-width: 600px; margin: 30px auto; background-color: #FFFFFF; border: 1px solid #E3C9A8; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(61,43,31,0.06); }
+        .header { background: linear-gradient(155deg, #1F150E 0%, #35241A 50%, #4A3324 100%); padding: 36px 30px; text-align: center; color: #FFFFFF; }
+        .brand-title { font-size: 20px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #FFFFFF; margin: 0; }
+        .brand-subtitle { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: #C4896A; margin-top: 6px; }
+        .content { padding: 40px 36px; text-align: center; }
+        .salutation { font-size: 18px; font-weight: 600; color: #3D2B1F; margin-bottom: 12px; }
+        .text { font-size: 14px; line-height: 1.6; color: #7A6B5D; margin-bottom: 24px; }
+        .btn-container { text-align: center; margin: 28px 0; }
+        .btn { display: inline-block; background: #3D2B1F; color: #FFFFFF !important; font-size: 13px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; text-decoration: none; padding: 14px 34px; border-radius: 8px; border: 1px solid #C4896A; }
+        .code-container { background: #FFFAF5; border: 1px dashed #C4896A; border-radius: 12px; padding: 18px 24px; display: inline-block; margin: 0 auto 20px auto; }
+        .code { font-size: 28px; font-weight: 700; letter-spacing: 0.25em; color: #3D2B1F; font-family: 'Courier New', Courier, monospace; }
+        .expiry-badge { display: inline-block; background: #FEF5EC; color: #C4896A; font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 20px; border: 1px solid #E3C9A8; margin-bottom: 24px; }
+        .footer { background: #FFFAF5; border-top: 1px solid #E3C9A8; padding: 24px 30px; text-align: center; font-size: 11px; color: #A09082; letter-spacing: 0.08em; text-transform: uppercase; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="header">
+          <h1 class="brand-title">The Handmade Vendor</h1>
+          <p class="brand-subtitle">Atelier Concierge • Security Services</p>
+        </div>
+        <div class="content">
+          <div class="salutation">Greetings, ${displayName}</div>
+          <p class="text">
+            A request was received to reset your patron credentials for The Handmade Vendor Atelier. 
+            To select a new secure password, please click the button below:
+          </p>
+          <div class="btn-container">
+            <a href="${resetUrl}" class="btn" target="_blank">Reset Your Password</a>
+          </div>
+          ${
+            code
+              ? `
+          <p class="text" style="font-size: 13px; margin-bottom: 12px;">Or enter this 6-digit recovery code directly in your browser:</p>
+          <div class="code-container">
+            <span class="code">${code}</span>
+          </div>
+          <br>
+          `
+              : ""
+          }
+          <div class="expiry-badge">
+            ⏱ Active for 15 minutes only
+          </div>
+          <p class="text" style="font-size: 12px; margin-bottom: 0; color: #8A7A6D;">
+            If you did not request this recovery link, your account remains secure and no further action is required.
+            For concierge assistance, reach us at <a href="mailto:concierge@thehandmadevendor.com" style="color: #C4896A;">concierge@thehandmadevendor.com</a>.
+          </p>
+        </div>
+        <div class="footer">
+          Artisan Mastery • Since 2018 • Florence, Italy
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (!user || !pass) {
+    console.log(`\n========================================================`);
+    console.log(`[THE HANDMADE VENDOR] Password Reset Email Generated:`);
+    console.log(`Recipient: ${email} (${displayName})`);
+    console.log(`Reset URL: ${resetUrl}`);
+    if (code) console.log(`Recovery Code: >>> ${code} <<<`);
+    console.log(`========================================================\n`);
+    return { success: true, simulated: true };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+
+  const mailOptions = {
+    from,
+    to: email,
+    subject: `${code ? `${code} is your ` : ""}Atelier Password Recovery Code • The Handmade Vendor`,
+    html: htmlContent,
+    text: `Your Atelier password recovery code is: ${code || ""}. You can also visit: ${resetUrl} to reset your password directly. This code is active for 10 minutes only.`,
+  };
+
+  await transporter.sendMail(mailOptions);
+  return { success: true, simulated: false };
+}
+
+interface SendPasswordResetSuccessEmailOptions {
+  email: string;
+  firstName?: string;
+}
+
+export async function sendPasswordResetSuccessEmail({
+  email,
+  firstName,
+}: SendPasswordResetSuccessEmailOptions) {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from =
+    process.env.SMTP_FROM ||
+    `"The Handmade Vendor Concierge" <concierge@thehandmadevendor.com>`;
+
+  const displayName = firstName?.trim() || "Valued Patron";
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Password Updated Successfully</title>
+      <style>
+        body { margin: 0; padding: 0; background-color: #FFFAF5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #3D2B1F; }
+        .wrapper { max-width: 600px; margin: 30px auto; background-color: #FFFFFF; border: 1px solid #E3C9A8; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(61,43,31,0.06); }
+        .header { background: linear-gradient(155deg, #1F150E 0%, #35241A 50%, #4A3324 100%); padding: 36px 30px; text-align: center; color: #FFFFFF; }
+        .brand-title { font-size: 20px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #FFFFFF; margin: 0; }
+        .brand-subtitle { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: #C4896A; margin-top: 6px; }
+        .content { padding: 40px 36px; text-align: center; }
+        .salutation { font-size: 18px; font-weight: 600; color: #3D2B1F; margin-bottom: 12px; }
+        .text { font-size: 14px; line-height: 1.6; color: #7A6B5D; margin-bottom: 24px; }
+        .badge { display: inline-block; background: #EBF5EC; color: #4E8752; font-size: 12px; font-weight: 700; padding: 8px 18px; border-radius: 20px; border: 1px solid #C8E6C9; margin-bottom: 24px; letter-spacing: 0.05em; }
+        .footer { background: #FFFAF5; border-top: 1px solid #E3C9A8; padding: 24px 30px; text-align: center; font-size: 11px; color: #A09082; letter-spacing: 0.08em; text-transform: uppercase; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="header">
+          <h1 class="brand-title">The Handmade Vendor</h1>
+          <p class="brand-subtitle">Atelier Concierge • Security Services</p>
+        </div>
+        <div class="content">
+          <div class="salutation">Notice for ${displayName}</div>
+          <div class="badge">
+            ✓ Password Updated Successfully
+          </div>
+          <p class="text">
+            Your patron credentials for The Handmade Vendor Atelier were recently changed. 
+            You can now sign in with your new password on any authenticated device.
+          </p>
+          <p class="text" style="font-size: 12px; margin-bottom: 0; color: #8A7A6D;">
+            If you did not perform this action, please contact our priority concierge desk immediately at 
+            <a href="mailto:concierge@thehandmadevendor.com" style="color: #C4896A;">concierge@thehandmadevendor.com</a>.
+          </p>
+        </div>
+        <div class="footer">
+          Artisan Mastery • Since 2018 • Florence, Italy
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  if (!user || !pass) {
+    console.log(`\n========================================================`);
+    console.log(`[THE HANDMADE VENDOR] Password Reset Success Notice:`);
+    console.log(`Recipient: ${email}`);
+    console.log(`Status: Password changed successfully.`);
+    console.log(`========================================================\n`);
+    return { success: true, simulated: true };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+
+  const mailOptions = {
+    from,
+    to: email,
+    subject: `Security Notice: Atelier Password Updated • The Handmade Vendor`,
+    html: htmlContent,
+    text: `Your password for The Handmade Vendor Atelier was successfully updated. If you did not make this change, please contact concierge@thehandmadevendor.com immediately.`,
+  };
+
+  await transporter.sendMail(mailOptions);
+  return { success: true, simulated: false };
+}
+
+

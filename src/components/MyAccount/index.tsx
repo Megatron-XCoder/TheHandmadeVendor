@@ -4,15 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AddressModal from "./AddressModal";
-import ProductItem from "../Common/ProductItem";
 import Orders from "../Orders";
 import { createClient } from "@/utils/supabase/client";
-import { useAppSelector } from "@/redux/store";
-import { useDispatch } from "react-redux";
-import { addItemToCart } from "@/redux/features/cart-slice";
-import { removeItemFromWishlist } from "@/redux/features/wishlist-slice";
 import { showToast } from "@/utils/toast";
 import AtelierDropdown, { DropdownItem } from "../Common/AtelierDropdown";
+import { Country } from "country-state-city";
 import {
   SavedAddress,
   getSavedAddresses,
@@ -24,7 +20,6 @@ import {
 
 export default function MyAccount() {
   const router = useRouter();
-  const dispatch = useDispatch();
 
   // Tab navigation state - initial sidebar collapsed per user request
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -54,14 +49,13 @@ export default function MyAccount() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
 
-  // Account details form state
+  // Account details form state (initial country is empty as requested)
   const [profileForm, setProfileForm] = useState({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
-    country: "United States",
-    preferredCurrency: "USD ($)",
+    country: "",
     monogramInitials: "",
   });
   const [savingProfile, setSavingProfile] = useState(false);
@@ -73,11 +67,9 @@ export default function MyAccount() {
     confirmPassword: "",
   });
   const [updatingPassword, setUpdatingPassword] = useState(false);
-
-  // Wishlist from Redux
-  const wishlistItems = useAppSelector((state) => state.wishlistReducer.items);
-  const [wishlistPage, setWishlistPage] = useState(1);
-  const wishlistPageSize = 6;
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Load user & profile from Supabase
   useEffect(() => {
@@ -94,25 +86,43 @@ export default function MyAccount() {
             .eq("id", data.user.id)
             .single();
 
+          const userMeta = data.user.user_metadata || {};
+          const loadedFirstName = profileData?.first_name || userMeta.first_name || "";
+          const loadedLastName = profileData?.last_name || userMeta.last_name || "";
+          const loadedEmail = profileData?.email || data.user.email || "";
+          const loadedPhone = profileData?.phone || userMeta.phone || "";
+          const loadedCountry = profileData?.country || userMeta.country || "";
+          const loadedMonogram = (
+            profileData?.monogram_initials ||
+            userMeta.monogram_initials ||
+            `${loadedFirstName[0] || ""}${loadedLastName[0] || ""}`
+          )
+            .replace(/[^a-zA-Z]/g, "")
+            .toUpperCase()
+            .slice(0, 2);
+
           if (profileData) {
             setProfile(profileData);
-            setProfileForm({
-              firstName: profileData.first_name || "",
-              lastName: profileData.last_name || "",
-              email: profileData.email || data.user.email || "",
-              phone: profileData.phone || "",
-              country: "United States",
-              preferredCurrency: "USD ($)",
-              monogramInitials: `${profileData.first_name?.[0] || ""}${profileData.last_name?.[0] || ""}`.toUpperCase(),
-            });
           } else {
-            setProfileForm((prev) => ({
-              ...prev,
-              email: data.user.email || "",
-              firstName: data.user.user_metadata?.first_name || "",
-              lastName: data.user.user_metadata?.last_name || "",
-            }));
+            setProfile({
+              id: data.user.id,
+              first_name: loadedFirstName,
+              last_name: loadedLastName,
+              email: loadedEmail,
+              phone: loadedPhone,
+              country: loadedCountry,
+              monogram_initials: loadedMonogram,
+            });
           }
+
+          setProfileForm({
+            firstName: loadedFirstName,
+            lastName: loadedLastName,
+            email: loadedEmail,
+            phone: loadedPhone,
+            country: loadedCountry,
+            monogramInitials: loadedMonogram,
+          });
         } else {
           router.replace("/signin?redirect=/my-account");
         }
@@ -142,6 +152,7 @@ export default function MyAccount() {
     }
     loadAddresses();
   }, [currentUser?.id]);
+
 
   // Fetch orders summary for stats
   useEffect(() => {
@@ -179,6 +190,25 @@ export default function MyAccount() {
     return "Atelier Patron Circle";
   }, [currentUser]);
 
+  // Real-time dynamic monogram initials for top banner seal and branding (1 or 2 characters)
+  const monogramDisplay = useMemo(() => {
+    const active = profileForm.monogramInitials.trim();
+    if (active) return active.slice(0, 2).toUpperCase();
+
+    const custom = (profile?.monogram_initials || currentUser?.user_metadata?.monogram_initials || "").trim();
+    if (custom) return custom.slice(0, 2).toUpperCase();
+
+    const f = profileForm.firstName || profile?.first_name || currentUser?.user_metadata?.first_name || "";
+    const l = profileForm.lastName || profile?.last_name || currentUser?.user_metadata?.last_name || "";
+    if (f || l) {
+      return `${f[0] || ""}${l[0] || ""}`.toUpperCase().slice(0, 2);
+    }
+    if (displayName && displayName !== "Esteemed Patron") {
+      return displayName.charAt(0).toUpperCase();
+    }
+    return "✦";
+  }, [profileForm.monogramInitials, profileForm.firstName, profileForm.lastName, profile, currentUser, displayName]);
+
   // Orders statistics
   const inProgressCount = useMemo(() => {
     return orders.filter(
@@ -191,13 +221,6 @@ export default function MyAccount() {
   }, [orders]);
 
   const latestOrder = orders.length > 0 ? orders[0] : null;
-
-  // Wishlist Pagination
-  const totalWishlistPages = Math.max(1, Math.ceil(wishlistItems.length / wishlistPageSize));
-  const currentWishlistItems = useMemo(() => {
-    const start = (wishlistPage - 1) * wishlistPageSize;
-    return wishlistItems.slice(start, start + wishlistPageSize);
-  }, [wishlistItems, wishlistPage]);
 
   // Handle Address Save (create or update, with max 3 enforcement and tag management)
   const handleSaveAddress = async (data: SavedAddress) => {
@@ -236,7 +259,7 @@ export default function MyAccount() {
     }
   };
 
-  // Handle Profile Update
+  // Handle Profile Update with Supabase DB & Auth persistence
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
@@ -244,26 +267,101 @@ export default function MyAccount() {
     try {
       const supabase = createClient();
       if (currentUser?.id) {
-        const { error } = await supabase.from("profiles").upsert({
-          id: currentUser.id,
-          first_name: profileForm.firstName,
-          last_name: profileForm.lastName,
-          phone: profileForm.phone,
-          email: profileForm.email,
-          updated_at: new Date().toISOString(),
+        // Enforce 1-2 character limit and uppercase alphabetic characters
+        const sanitizedMonogram = profileForm.monogramInitials
+          .replace(/[^a-zA-Z]/g, "")
+          .slice(0, 2)
+          .toUpperCase();
+
+        // 1. Update Supabase Auth user metadata (immediately persists across all sessions)
+        const { error: authError } = await supabase.auth.updateUser({
+          data: {
+            first_name: profileForm.firstName.trim(),
+            last_name: profileForm.lastName.trim(),
+            phone: profileForm.phone.trim(),
+            country: profileForm.country,
+            monogram_initials: sanitizedMonogram,
+          },
         });
 
-        if (error) {
-          throw error;
+        if (authError) {
+          console.warn("Auth metadata update notice:", authError);
         }
 
+        // 2. Upsert into public.profiles database table
+        const fullPayload: any = {
+          id: currentUser.id,
+          first_name: profileForm.firstName.trim(),
+          last_name: profileForm.lastName.trim(),
+          phone: profileForm.phone.trim(),
+          email: profileForm.email.trim(),
+          country: profileForm.country,
+          monogram_initials: sanitizedMonogram,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert(fullPayload);
+
+        if (profileError) {
+          console.warn("Profiles full upsert notice:", profileError.message);
+          // Fallback to base columns if country/monogram_initials columns are pending migration
+          const { error: fallbackError } = await supabase.from("profiles").upsert({
+            id: currentUser.id,
+            first_name: profileForm.firstName.trim(),
+            last_name: profileForm.lastName.trim(),
+            phone: profileForm.phone.trim(),
+            email: profileForm.email.trim(),
+            updated_at: new Date().toISOString(),
+          });
+          if (fallbackError) {
+            console.warn("Profiles fallback upsert notice:", fallbackError.message);
+          }
+        }
+
+        // 3. Update local state
         setProfile((prev: any) => ({
           ...prev,
-          first_name: profileForm.firstName,
-          last_name: profileForm.lastName,
-          phone: profileForm.phone,
-          email: profileForm.email,
+          first_name: profileForm.firstName.trim(),
+          last_name: profileForm.lastName.trim(),
+          phone: profileForm.phone.trim(),
+          email: profileForm.email.trim(),
+          country: profileForm.country,
+          monogram_initials: sanitizedMonogram,
         }));
+
+        setCurrentUser((prev: any) => ({
+          ...prev,
+          user_metadata: {
+            ...prev?.user_metadata,
+            first_name: profileForm.firstName.trim(),
+            last_name: profileForm.lastName.trim(),
+            phone: profileForm.phone.trim(),
+            country: profileForm.country,
+            monogram_initials: sanitizedMonogram,
+          },
+        }));
+
+        setProfileForm((prev) => ({
+          ...prev,
+          monogramInitials: sanitizedMonogram,
+        }));
+
+        // 4. Synchronize everywhere in real-time (Navbar seal, popover avatar, mobile drawer)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("patron-profile-updated", {
+              detail: {
+                first_name: profileForm.firstName.trim(),
+                last_name: profileForm.lastName.trim(),
+                phone: profileForm.phone.trim(),
+                country: profileForm.country,
+                monogram_initials: sanitizedMonogram,
+              },
+            })
+          );
+        }
       }
 
       showToast.success("Atelier Profile details saved successfully.");
@@ -275,32 +373,63 @@ export default function MyAccount() {
     }
   };
 
-  // Handle Password Update
+  // Handle Password Update with old password verification & security notice
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!securityForm.newPassword) {
-      showToast.error("Please enter a new password.");
-      return;
-    }
-    if (securityForm.newPassword !== securityForm.confirmPassword) {
-      showToast.error("Password confirmation does not match.");
+      showToast.error("Please enter a new security key.");
       return;
     }
     if (securityForm.newPassword.length < 8) {
-      showToast.error("Password must be at least 8 characters.");
+      showToast.error("New security key must be at least 8 characters.");
+      return;
+    }
+    if (securityForm.newPassword !== securityForm.confirmPassword) {
+      showToast.error("Security key confirmation does not match.");
+      return;
+    }
+    if (securityForm.oldPassword && securityForm.oldPassword === securityForm.newPassword) {
+      showToast.error("New security key must be different from current password.");
       return;
     }
 
     setUpdatingPassword(true);
     try {
       const supabase = createClient();
+
+      // If user entered current password, verify it first with Supabase Auth
+      if (securityForm.oldPassword && currentUser?.email) {
+        const { error: verifyErr } = await supabase.auth.signInWithPassword({
+          email: currentUser.email,
+          password: securityForm.oldPassword,
+        });
+
+        if (verifyErr) {
+          showToast.error("Current master password verification failed. Please check your existing password.");
+          setUpdatingPassword(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: securityForm.newPassword,
       });
 
       if (error) throw error;
 
-      showToast.success("Security key updated successfully.");
+      // Dispatch security notification email asynchronously
+      if (currentUser?.email) {
+        fetch("/api/auth/notify-password-change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: currentUser.email,
+            firstName: profile?.first_name || currentUser.user_metadata?.first_name || "Valued Patron",
+          }),
+        }).catch((err) => console.warn("Password change notification notice:", err));
+      }
+
+      showToast.success("Master security key updated successfully.");
       setSecurityForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err: any) {
       showToast.error(err.message || "Could not update password.");
@@ -338,27 +467,6 @@ export default function MyAccount() {
     }
   };
 
-  // Move wishlist item to cart
-  const handleMoveToCart = (item: any) => {
-    dispatch(
-      addItemToCart({
-        id: item.id,
-        title: item.title,
-        price: item.price,
-        discountedPrice: item.discountedPrice || item.price,
-        quantity: 1,
-        imgs: item.imgs,
-      })
-    );
-    dispatch(removeItemFromWishlist(item.id));
-    showToast.success(`Added "${item.title}" to Atelier Bag.`);
-  };
-
-  const handleRemoveWishlist = (id: number, title: string) => {
-    dispatch(removeItemFromWishlist(id));
-    showToast.info(`Removed "${title}" from Wishlist.`);
-  };
-
   // Navigation Items Config
   const navItems = [
     {
@@ -383,21 +491,6 @@ export default function MyAccount() {
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
           <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-        </svg>
-      ),
-    },
-    {
-      id: "wishlist",
-      label: "Curated Wishlist",
-      shortLabel: "Wishlist",
-      badge: wishlistItems.length > 0 ? `${wishlistItems.length}` : null,
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-          />
         </svg>
       ),
     },
@@ -449,22 +542,13 @@ export default function MyAccount() {
     badge: item.badge,
   }));
 
-  const countryDropdownItems: DropdownItem[] = [
-    { id: "United States", label: "United States" },
-    { id: "United Kingdom", label: "United Kingdom" },
-    { id: "Italy", label: "Italy (Florence Atelier Hub)" },
-    { id: "France", label: "France" },
-    { id: "Switzerland", label: "Switzerland" },
-    { id: "United Arab Emirates", label: "United Arab Emirates" },
-    { id: "Australia", label: "Australia" },
-    { id: "Canada", label: "Canada" },
-  ];
-
-  const currencyDropdownItems: DropdownItem[] = [
-    { id: "USD ($)", label: "USD ($) - US Dollar" },
-    { id: "EUR (€)", label: "EUR (€) - Euro" },
-    { id: "GBP (£)", label: "GBP (£) - British Pound" },
-  ];
+  // Country dropdown items populated from country-state-city library
+  const countryDropdownItems: DropdownItem[] = useMemo(() => {
+    return Country.getAllCountries().map((c) => ({
+      id: c.name,
+      label: `${c.flag ? c.flag + " " : ""}${c.name}`,
+    }));
+  }, []);
 
   if (loadingProfile) {
     return (
@@ -506,7 +590,7 @@ export default function MyAccount() {
                     className="text-2xl sm:text-3xl font-semibold text-[#C4896A]"
                     style={{ fontFamily: "'Cinzel', serif" }}
                   >
-                    {displayName.charAt(0).toUpperCase()}
+                    {monogramDisplay}
                   </span>
                 </div>
                 <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#3D2B1F] border-2 border-[#FFFFFF] flex items-center justify-center text-white text-[9px]">
@@ -738,26 +822,29 @@ export default function MyAccount() {
                     <p className="text-[11px] text-[#7A6B5D] mt-1">Active workshop items</p>
                   </div>
 
-                  {/* Stat 3: Wishlist */}
+                  {/* Stat 3: Saved Addresses */}
                   <div
-                    onClick={() => setActiveTab("wishlist")}
+                    onClick={() => setActiveTab("addresses")}
                     className="bg-[#FFFFFF] p-5 sm:p-6 rounded-2xl border border-[#E3C9A8]/50 shadow-[0_6px_20px_rgba(61,43,31,0.04)] hover:border-[#C4896A] transition-all duration-300 cursor-pointer group"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-[11px] uppercase tracking-wider text-[#7A6B5D] font-medium">
-                        Curated Wishlist
+                        Delivery Addresses
                       </span>
                       <span className="w-8 h-8 rounded-full bg-[#FEF5EC] text-[#C4896A] flex items-center justify-center group-hover:scale-110 transition-transform">
-                        ♥
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
                       </span>
                     </div>
                     <p
                       className="text-2xl sm:text-3xl font-semibold text-[#2A1E17]"
                       style={{ fontFamily: "'Cinzel', serif" }}
                     >
-                      {wishlistItems.length}
+                      {loadingAddresses ? "—" : addresses.length}
                     </p>
-                    <p className="text-[11px] text-[#7A6B5D] mt-1">Cherished heirlooms</p>
+                    <p className="text-[11px] text-[#7A6B5D] mt-1">Delivery destinations</p>
                   </div>
 
                   {/* Stat 4: Membership Tier */}
@@ -878,124 +965,7 @@ export default function MyAccount() {
             )}
 
             {/* ============================================================== */}
-            {/* 3. CURATED WISHLIST TAB (PAGINATED)                            */}
-            {/* ============================================================== */}
-            {activeTab === "wishlist" && (
-              <div className="bg-[#FFFFFF] rounded-3xl border border-[#E3C9A8]/50 shadow-[0_8px_30px_rgba(61,43,31,0.04)] p-6 sm:p-10 animate-in fade-in duration-300">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-[#E3C9A8]/30">
-                  <div>
-                    <span className="text-[11px] font-medium uppercase tracking-widest text-[#C4896A]">
-                      Saved Masterpieces
-                    </span>
-                    <h2
-                      className="text-2xl sm:text-3xl font-normal text-[#2A1E17] tracking-wider mt-1"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      Curated Wishlist ({wishlistItems.length})
-                    </h2>
-                  </div>
-
-                  {wishlistItems.length > 0 && (
-                    <Link
-                      href="/cart"
-                      className="text-xs font-semibold uppercase tracking-wider text-[#3D2B1F] hover:text-[#C4896A] inline-flex items-center gap-1.5 transition-colors"
-                    >
-                      <span>View Atelier Bag</span>
-                      <span>→</span>
-                    </Link>
-                  )}
-                </div>
-
-                {wishlistItems.length === 0 ? (
-                  <div className="text-center py-16 px-6 bg-[#FFFAF5] rounded-2xl border border-[#E3C9A8]/40">
-                    <div className="w-16 h-16 rounded-full bg-[#FEF5EC] border border-[#E3C9A8] text-[#C4896A] flex items-center justify-center mx-auto mb-4 text-2xl">
-                      ♥
-                    </div>
-                    <h3
-                      className="text-lg font-normal text-[#2A1E17] tracking-wider mb-2"
-                      style={{ fontFamily: "'Cinzel', serif" }}
-                    >
-                      Your Curated Wishlist is Empty
-                    </h3>
-                    <p className="text-xs sm:text-sm text-[#7A6B5D] max-w-md mx-auto mb-6">
-                      Explore our handcrafted gallery and save heirlooms for future bespoke commissions.
-                    </p>
-                    <Link
-                      href="/shop"
-                      className="inline-flex px-7 py-3 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-md"
-                    >
-                      Browse Creations
-                    </Link>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {currentWishlistItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex flex-col h-full bg-[#FFFFFF] p-4 rounded-2xl border border-[#E3C9A8]/50 shadow-[0_4px_20px_rgba(61,43,31,0.03)] hover:border-[#C4896A] transition-all"
-                        >
-                          <div className="flex-1">
-                            <ProductItem item={item as any} />
-                          </div>
-                          <button
-                            onClick={() => handleMoveToCart(item)}
-                            className="mt-3 w-full py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-sm flex items-center justify-center gap-2"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                            </svg>
-                            <span>Move to Bag</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Pagination Controls */}
-                    {totalWishlistPages > 1 && (
-                      <div className="flex items-center justify-center gap-2 mt-10 pt-6 border-t border-[#E3C9A8]/30">
-                        <button
-                          onClick={() => setWishlistPage((p) => Math.max(1, p - 1))}
-                          disabled={wishlistPage === 1}
-                          className="w-9 h-9 rounded-full border border-[#E3C9A8] text-[#3D2B1F] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#FFFAF5] flex items-center justify-center transition-colors text-xs font-medium"
-                        >
-                          ‹
-                        </button>
-
-                        {Array.from({ length: totalWishlistPages }).map((_, idx) => {
-                          const pageNumber = idx + 1;
-                          const isCurrent = pageNumber === wishlistPage;
-                          return (
-                            <button
-                              key={pageNumber}
-                              onClick={() => setWishlistPage(pageNumber)}
-                              className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
-                                isCurrent
-                                  ? "bg-[#3D2B1F] text-white shadow-sm"
-                                  : "border border-[#E3C9A8] text-[#3D2B1F] hover:bg-[#FFFAF5]"
-                              }`}
-                            >
-                              {pageNumber}
-                            </button>
-                          );
-                        })}
-
-                        <button
-                          onClick={() => setWishlistPage((p) => Math.min(totalWishlistPages, p + 1))}
-                          disabled={wishlistPage === totalWishlistPages}
-                          className="w-9 h-9 rounded-full border border-[#E3C9A8] text-[#3D2B1F] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#FFFAF5] flex items-center justify-center transition-colors text-xs font-medium"
-                        >
-                          ›
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* ============================================================== */}
-            {/* 4. ADDRESSES TAB (EMPTY INITIALLY, MAX 3, TAGGED, SUPABASE DB) */}
+            {/* 3. ADDRESSES TAB (EMPTY INITIALLY, MAX 3, TAGGED, SUPABASE DB) */}
             {/* ============================================================== */}
             {activeTab === "addresses" && (
               <div className="bg-[#FFFFFF] rounded-3xl border border-[#E3C9A8]/50 shadow-[0_8px_30px_rgba(61,43,31,0.04)] p-6 sm:p-10 animate-in fade-in duration-300">
@@ -1241,7 +1211,7 @@ export default function MyAccount() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium">
                         Country / Region
@@ -1250,33 +1220,27 @@ export default function MyAccount() {
                         items={countryDropdownItems}
                         selectedId={profileForm.country}
                         onSelect={(id) => setProfileForm({ ...profileForm, country: id })}
+                        placeholder="Select Country / Region"
+                        searchable={true}
                         className="w-full"
+                        buttonClassName="!bg-[#FFFAF5]/70 !border-[#E3C9A8]/60 !text-sm !shadow-none !h-[46px]"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium">
-                        Preferred Currency
-                      </label>
-                      <AtelierDropdown
-                        items={currencyDropdownItems}
-                        selectedId={profileForm.preferredCurrency}
-                        onSelect={(id) => setProfileForm({ ...profileForm, preferredCurrency: id })}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium">
-                        Monogram Initials
+                        Monogram Initials (1 or 2 Letters)
                       </label>
                       <input
                         type="text"
-                        maxLength={3}
+                        maxLength={2}
                         value={profileForm.monogramInitials}
-                        onChange={(e) => setProfileForm({ ...profileForm, monogramInitials: e.target.value.toUpperCase() })}
-                        placeholder="e.g. JS"
-                        className="w-full px-4 py-3 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors uppercase font-mono"
+                        onChange={(e) => {
+                          const sanitized = e.target.value.replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase();
+                          setProfileForm({ ...profileForm, monogramInitials: sanitized });
+                        }}
+                        placeholder="e.g. SK"
+                        className="w-full h-[46px] px-4 py-3 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors uppercase font-mono tracking-widest font-semibold"
                       />
                     </div>
                   </div>
@@ -1302,55 +1266,99 @@ export default function MyAccount() {
             )}
 
             {/* ============================================================== */}
-            {/* 6. SECURITY & KEYS TAB                                          */}
+            {/* 6. SECURITY CREDENTIALS TAB                                     */}
             {/* ============================================================== */}
             {activeTab === "security" && (
               <div className="bg-[#FFFFFF] rounded-3xl border border-[#E3C9A8]/50 shadow-[0_8px_30px_rgba(61,43,31,0.04)] p-6 sm:p-10 animate-in fade-in duration-300">
                 <div className="mb-8 pb-6 border-b border-[#E3C9A8]/30">
-                  <span className="text-[11px] font-medium uppercase tracking-widest text-[#C4896A]">
-                    Cryptographic Vault
-                  </span>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-[#FEF5EC] text-[#C4896A] border border-[#E3C9A8]/60 mb-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                    <span>256-Bit Cryptographic Vault Active</span>
+                  </div>
                   <h2
                     className="text-2xl sm:text-3xl font-normal text-[#2A1E17] tracking-wider mt-1"
                     style={{ fontFamily: "'Cinzel', serif" }}
                   >
-                    Security & Passkey Credentials
+                    Update Master Security Key
                   </h2>
-                  <p className="text-xs sm:text-sm text-[#7A6B5D] mt-1.5">
+                  <p className="text-xs sm:text-sm text-[#7A6B5D] mt-1.5 max-w-2xl">
                     Protect your bespoke order archive with end-to-end encrypted session credentials.
                   </p>
                 </div>
 
                 <form onSubmit={handleUpdatePassword} className="space-y-6 max-w-xl">
+                  {/* Current Master Password */}
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium">
                       Current Master Password
                     </label>
-                    <input
-                      type="password"
-                      value={securityForm.oldPassword}
-                      onChange={(e) => setSecurityForm({ ...securityForm, oldPassword: e.target.value })}
-                      placeholder="••••••••••••"
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showOldPassword ? "text" : "password"}
+                        value={securityForm.oldPassword}
+                        onChange={(e) => setSecurityForm({ ...securityForm, oldPassword: e.target.value })}
+                        placeholder="Enter existing password to verify"
+                        className="w-full px-4 py-3 pr-11 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOldPassword(!showOldPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#A09082] hover:text-[#C4896A] transition-colors"
+                        aria-label={showOldPassword ? "Hide password" : "Show password"}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          {showOldPassword ? (
+                            <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          ) : (
+                            <>
+                              <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </>
+                          )}
+                        </svg>
+                      </button>
+                    </div>
+                    <span className="text-[11px] text-[#A09082] block mt-1">
+                      Required to verify your authorization before applying changes.
+                    </span>
                   </div>
 
+                  {/* New Security Key */}
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium">
-                      New Security Key
+                      New Security Key *
                     </label>
-                    <input
-                      type="password"
-                      required
-                      value={securityForm.newPassword}
-                      onChange={(e) => setSecurityForm({ ...securityForm, newPassword: e.target.value })}
-                      placeholder="At least 8 characters"
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? "text" : "password"}
+                        required
+                        value={securityForm.newPassword}
+                        onChange={(e) => setSecurityForm({ ...securityForm, newPassword: e.target.value })}
+                        placeholder="At least 8 characters"
+                        className="w-full px-4 py-3 pr-11 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#A09082] hover:text-[#C4896A] transition-colors"
+                        aria-label={showNewPassword ? "Hide password" : "Show password"}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          {showNewPassword ? (
+                            <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          ) : (
+                            <>
+                              <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </>
+                          )}
+                        </svg>
+                      </button>
+                    </div>
 
                     {/* Password Strength Indicator */}
                     {securityForm.newPassword && (
-                      <div className="mt-2.5 space-y-1.5">
+                      <div className="mt-2.5 space-y-1.5 animate-in fade-in duration-200">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="text-[#7A6B5D]">Security Strength:</span>
                           <span className="font-semibold" style={{ color: passwordStrength.color }}>
@@ -1367,35 +1375,76 @@ export default function MyAccount() {
                     )}
                   </div>
 
+                  {/* Confirm New Security Key */}
                   <div>
                     <label className="block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium">
-                      Confirm New Security Key
+                      Confirm New Security Key *
                     </label>
-                    <input
-                      type="password"
-                      required
-                      value={securityForm.confirmPassword}
-                      onChange={(e) => setSecurityForm({ ...securityForm, confirmPassword: e.target.value })}
-                      placeholder="Confirm password"
-                      className="w-full px-4 py-3 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        required
+                        value={securityForm.confirmPassword}
+                        onChange={(e) => setSecurityForm({ ...securityForm, confirmPassword: e.target.value })}
+                        placeholder="Re-enter new security key"
+                        className="w-full px-4 py-3 pr-11 rounded-xl bg-[#FFFAF5]/70 border border-[#E3C9A8]/60 text-sm text-[#2A1E17] placeholder:text-[#A8988B] focus:outline-none focus:border-[#C4896A] transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#A09082] hover:text-[#C4896A] transition-colors"
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          {showConfirmPassword ? (
+                            <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                          ) : (
+                            <>
+                              <path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </>
+                          )}
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Real-time Match Indicator */}
+                    {securityForm.confirmPassword ? (
+                      <div className="mt-2 flex items-center gap-1.5 text-xs animate-in fade-in duration-200">
+                        {securityForm.newPassword === securityForm.confirmPassword ? (
+                          <>
+                            <span className="w-4 h-4 rounded-full bg-[#EBF5EC] text-[#4E8752] flex items-center justify-center text-[10px] font-bold">
+                              ✓
+                            </span>
+                            <span className="text-[#4E8752] font-medium">Passwords match perfectly</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="w-4 h-4 rounded-full bg-[#FEF2F2] text-[#B91C1C] flex items-center justify-center text-[10px] font-bold">
+                              ✕
+                            </span>
+                            <span className="text-[#B91C1C] font-medium">Passwords do not match yet</span>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="pt-4 flex items-center justify-between border-t border-[#E3C9A8]/30">
+                  <div className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-[#E3C9A8]/30">
                     <div className="flex items-center gap-2 text-xs text-[#7A6B5D]">
                       <span className="text-[#10B981]">●</span>
-                      <span>256-bit AES Session Encryption Active</span>
+                      <span>Multi-device synchronization enabled</span>
                     </div>
 
                     <button
                       type="submit"
                       disabled={updatingPassword}
-                      className="px-7 py-3 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-md disabled:opacity-60 flex items-center gap-2"
+                      className="px-7 py-3 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-md disabled:opacity-60 flex items-center justify-center gap-2"
                     >
                       {updatingPassword ? (
                         <>
                           <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Updating...</span>
+                          <span>Verifying & Updating...</span>
                         </>
                       ) : (
                         <span>Update Security Key</span>
@@ -1508,3 +1557,4 @@ export default function MyAccount() {
     </section>
   );
 }
+

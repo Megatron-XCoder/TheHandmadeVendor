@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { menuData } from "./menuData";
@@ -236,28 +236,91 @@ const Header = () => {
   const wishlistItems = useAppSelector((state) => state.wishlistReducer.items);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Supabase Auth listener
+  // Supabase Auth listener & profile sync
   useEffect(() => {
     try {
       const supabase = createClient();
+
+      const fetchProfile = async (userId: string) => {
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("first_name, last_name, country, monogram_initials")
+            .eq("id", userId)
+            .single();
+          if (data) {
+            setUserProfile(data);
+          }
+        } catch (e) {
+          // profiles query fallback
+        }
+      };
+
       supabase.auth.getUser().then(({ data }) => {
         setCurrentUser(data.user);
+        if (data?.user?.id) {
+          fetchProfile(data.user.id);
+        }
       });
+
       const { data: authListener } = supabase.auth.onAuthStateChange(
         (_event, session) => {
           setCurrentUser(session?.user ?? null);
+          if (session?.user?.id) {
+            fetchProfile(session.user.id);
+          } else {
+            setUserProfile(null);
+          }
         }
       );
+
+      // Listen for profile update custom events from MyAccount for real-time reactivity
+      const handleProfileUpdate = (e: any) => {
+        if (e.detail) {
+          setUserProfile((prev: any) => ({ ...prev, ...e.detail }));
+          setCurrentUser((prev: any) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              user_metadata: {
+                ...prev.user_metadata,
+                ...e.detail,
+              },
+            };
+          });
+        }
+      };
+      window.addEventListener("patron-profile-updated", handleProfileUpdate);
+
       return () => {
         authListener.subscription.unsubscribe();
+        window.removeEventListener("patron-profile-updated", handleProfileUpdate);
       };
     } catch (e) {
       // Supabase unconfigured
     }
   }, []);
+
+  // Compute dynamic header monogram initials (strictly 1 or 2 characters)
+  const headerMonogram = useMemo(() => {
+    const custom = (userProfile?.monogram_initials || currentUser?.user_metadata?.monogram_initials || "").trim();
+    if (custom) {
+      return custom.slice(0, 2).toUpperCase();
+    }
+    const f = userProfile?.first_name || currentUser?.user_metadata?.first_name || "";
+    const l = userProfile?.last_name || currentUser?.user_metadata?.last_name || "";
+    if (f || l) {
+      return `${f[0] || ""}${l[0] || ""}`.toUpperCase().slice(0, 2);
+    }
+    if (currentUser?.email) {
+      return currentUser.email[0].toUpperCase();
+    }
+    return "✦";
+  }, [userProfile, currentUser]);
 
   // Close user menu on outside click
   useEffect(() => {
@@ -441,17 +504,24 @@ const Header = () => {
                 {currentUser ? (
                   <div className="relative" ref={userMenuRef}>
                     <div className="relative inline-block">
-                      <IconBtn
-                        label="User account"
+                      <button
+                        type="button"
+                        aria-label="User account"
                         onClick={() => setUserMenuOpen(!userMenuOpen)}
-                        active={userMenuOpen}
+                        className={`relative flex items-center justify-center w-9 h-9 rounded-full border transition-all duration-200 cursor-pointer shadow-sm ${
+                          userMenuOpen
+                            ? "border-[#C4896A] bg-[#FEF5EC] text-[#C4896A]"
+                            : "border-[#E3C9A8] bg-[#FFFAF5] hover:border-[#C4896A] hover:bg-[#FEF5EC] text-[#3D2B1F]"
+                        }`}
                       >
-                        <UserIcon />
-                      </IconBtn>
-                      <span
-                        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none"
-                        style={{ background: "#C4896A" }}
-                      />
+                        <span className="text-xs font-bold tracking-wider font-mono">
+                          {headerMonogram}
+                        </span>
+                        <span
+                          className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none"
+                          style={{ background: "#C4896A" }}
+                        />
+                      </button>
                     </div>
 
                     {userMenuOpen && (
@@ -459,18 +529,25 @@ const Header = () => {
                         className="absolute right-0 top-full mt-2 w-56 rounded-2xl bg-white border p-3 shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-200"
                         style={{ borderColor: "#E3C9A8" }}
                       >
-                        <div className="px-3 py-2 border-b border-[#E3C9A8]/40 mb-2">
-                          <span
-                            className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#C4896A] block"
-                            style={{ fontFamily: "'Cinzel', serif" }}
+                        <div className="px-3 py-2 border-b border-[#E3C9A8]/40 mb-2 flex items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 border border-[#E3C9A8] bg-[#FEF5EC] text-[#C4896A] font-mono shadow-xs"
                           >
-                            Atelier Member
-                          </span>
-                          <p className="text-xs font-medium text-[#3D2B1F] truncate mt-0.5">
-                            {currentUser.user_metadata?.first_name
-                              ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name || ""}`.trim()
-                              : currentUser.email}
-                          </p>
+                            {headerMonogram}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className="text-[10px] tracking-[0.2em] uppercase font-semibold text-[#C4896A] block"
+                              style={{ fontFamily: "'Cinzel', serif" }}
+                            >
+                              Atelier Member
+                            </span>
+                            <p className="text-xs font-medium text-[#3D2B1F] truncate mt-0.5">
+                              {currentUser.user_metadata?.first_name
+                                ? `${currentUser.user_metadata.first_name} ${currentUser.user_metadata.last_name || ""}`.trim()
+                                : currentUser.email}
+                            </p>
+                          </div>
                         </div>
 
                         <div className="space-y-1 text-xs">
@@ -661,10 +738,9 @@ const Header = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 rounded-xl bg-[#FEF5EC] border border-[#E3C9A8]/60">
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
-                  style={{ background: "#C4896A" }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 border border-[#E3C9A8] bg-[#FEF5EC] text-[#C4896A] font-mono shadow-sm"
                 >
-                  {(currentUser.user_metadata?.first_name?.[0] || currentUser.email?.[0] || "U").toUpperCase()}
+                  {headerMonogram}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span

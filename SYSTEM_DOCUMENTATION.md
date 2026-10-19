@@ -19,6 +19,7 @@
    - [SSR Architecture & Cookie Management](#ssr-architecture--cookie-management)
    - [5-Minute Personalized Email Verification (Nodemailer)](#5-minute-personalized-email-verification-nodemailer)
    - [Google OAuth Integration](#google-oauth-integration)
+   - [Patron Credential Recovery (Forgot & Reset Password Architecture)](#patron-credential-recovery-forgot--reset-password-architecture)
    - [Security & Anti-Abuse Controls](#security--anti-abuse-controls)
 5. [Database Schema & Migrations (PostgreSQL)](#5-database-schema--migrations-postgresql)
    - [Schema Diagram](#schema-diagram)
@@ -315,6 +316,66 @@ POST /api/auth/verify-code
   });
   ```
 - Works out-of-the-box on the Supabase free tier once Google Client ID and Secret are configured in the Supabase Dashboard.
+
+---
+
+### Patron Credential Recovery (Forgot & Reset Password Architecture)
+
+A multi-tier, secure password recovery pipeline providing seamless credential restoration across email links and direct 6-digit OTP codes:
+
+```
+[ Sign In Page (/signin) ]
+             │
+             ▼ Click "Forgot Password?" (with email prefill)
+[ Forgot Password Page (/forgot-password) ]
+             │
+             ▼ POST /api/auth/forgot-password
+[ Supabase Auth & Luxury Nodemailer Email Dispatched ]
+             │
+             ├────────────────────────────────────────┬────────────────────────────────────────┐
+             │ Path A: Email Magic Recovery Link      │ Path B: 6-Digit In-Browser OTP Code     │
+             ▼                                        ▼                                        ▼
+   User clicks link in email:                User enters 6-digit code on /forgot-password:
+   /auth/callback?code=...&next=/reset-password  supabase.auth.verifyOtp({ token, type: 'recovery' })
+             │                                        │
+             ▼ exchangeCodeForSession(code)           ▼ Session established in-browser
+   Active recovery session established                 In-place switch to "Set New Password" form
+             │                                        │
+             └────────────────────────────────────────┴────────────────────────────────────────┘
+                                     │
+                                     ▼
+                      [ Reset Password Interface ]
+                                     │
+                     supabase.auth.updateUser({ password })
+                                     │
+                                     ▼
+                POST /api/auth/password-reset-success (Security Alert)
+                                     │
+                                     ▼
+                Success Toast ──► Auto-login to /my-account
+```
+
+1. **Smart Email Prefill Link (`src/components/Auth/Signin/index.tsx`)**:
+   - Replaced static placeholder `<a href="#">Forgot Password?</a>` with dynamic `<Link href={email ? "/forgot-password?email=..." : "/forgot-password"}>`.
+   - If the user already typed their email address on the sign-in form, it pre-populates into `/forgot-password`.
+
+2. **Dedicated Recovery Route (`src/app/(site)/(pages)/forgot-password/page.tsx` & `ForgotPassword/index.tsx`)**:
+   - Two-column luxury Atelier card layout matching `/signin` and `/signup`.
+   - State `REQUEST`: Email input, loading state, dispatch CTA.
+   - State `SENT`: Detailed recovery instructions, 60-second resend cooldown timer, and direct 6-digit OTP code verification.
+   - State `RESET`: If the patron verifies their 6-digit OTP code directly, the form transitions to the password creation interface without requiring an external tab switch.
+
+3. **Dedicated Reset Password Route (`src/app/(site)/(pages)/reset-password/page.tsx` & `ResetPassword/index.tsx`)**:
+   - Validates active session on mount.
+   - If the recovery token has expired or is invalid, displays an informative security notice with a direct link to request a fresh link.
+   - New Password & Confirm Password inputs with visibility toggles.
+   - Real-time password match indicator (Sage green `✓ Passwords match` or red `✕ Passwords do not match yet`).
+   - Minimum 8-character constraint.
+   - Submits via `supabase.auth.updateUser({ password })`.
+
+4. **Luxury Email Notification Templates (`src/utils/email.ts`)**:
+   - `sendPasswordResetEmail`: Luxury Florence Atelier HTML email featuring gold accents, 15-minute expiration notice, direct reset button, and optional 6-digit fallback code.
+   - `sendPasswordResetSuccessEmail`: Automated security notification confirming password update timestamp, alerting the patron to contact the concierge if unauthorized.
 
 ---
 
@@ -1045,6 +1106,76 @@ Today's development session focused on elevating the **Atelier Patron Portal (`/
 
 ---
 
+## 16. Security & Master Security Key Architecture
+
+### Overview
+The **Security & Keys** section in the Atelier Patron Portal (`/my-account`) is streamlined exclusively for **Master Security Key (Password) Management**, protected by 256-bit cryptographic verification. Unused peripheral modules (hardware passkeys, secondary session lists) were completely deprecated and removed to deliver a clean, focused, high-security authentication interface.
+
+### 1. Master Security Key Credentials Security (`src/components/MyAccount/index.tsx`)
+- **Existing Password Verification**:
+  - Before applying any key modification, re-authenticates the current password using `supabase.auth.signInWithPassword({ email, password: oldPassword })`.
+  - Blocks unauthorized overwrites from unattended sessions or stolen tokens.
+- **Dynamic Security Key Strength Meter**:
+  - Evaluates minimum length (8+ / 12+ chars), mixed uppercase/lowercase, numerical digits, and special characters.
+  - Dynamically categorizes strength into *Fragile*, *Moderate*, *Artisan Grade*, and *Impenetrable* with luxury animated status bars.
+  - Real-time confirmation matching indicator (`✓ Passwords match perfectly` / `✕ Passwords do not match yet`).
+- **Show/Hide Key Toggles**:
+  - Upgraded all password toggles across the application (`MyAccount`, `Signin`, `Signup`, `ForgotPassword`, and `ResetPassword`) to unified, mathematically precise **Heroicons v2 `EyeIcon` and `EyeSlashIcon`** (viewBox `0 0 24 24`, strokeWidth `1.75`).
+  - Completely resolved the issue where previous disconnected SVG curves and external diagonal line elements rendered as a broken squiggle or white slash gap.
+- **Immediate Security Notification Dispatch**:
+  - Upon successful key update, invokes `/api/auth/notify-password-change` to deliver an automated Nodemailer confirmation notice (`sendPasswordResetSuccessEmail`) directly to the patron's registered email address.
+
+### 2. Streamlined Navigation & Curated Wishlist Removal from My Account
+- Removed the **Curated Wishlist** tab and section completely from `/my-account`:
+  - Removed from sidebar navigation and mobile dropdown selector.
+  - Replaced the Wishlist dashboard stat card with an active **Delivery Addresses** counter (`addresses.length`) linking directly to the Addresses tab.
+  - Removed redundant Redux wishlist subscriptions, pagination state, and cart transfer handlers from the component.
+  - Preserved the primary header wishlist slideout drawer for uninterrupted browsing and cart interactions across the store.
+
+---
+
+## 17. Patron Profile & Monogram Initials Architecture (`/my-account`)
+
+### Overview
+The **Patron Profile & Atelier Preferences** section of `/my-account` was upgraded to provide comprehensive database persistence, integrated country geography, streamlined preferences, and real-time monogram initials synchronization across the entire storefront navigation.
+
+### 1. Database Persistence (`public.profiles` & `auth.users`)
+- **Dual-Layer Cloud Persistence**:
+  - `auth.users.raw_user_meta_data`: Updates via `supabase.auth.updateUser({ data: { first_name, last_name, phone, country, monogram_initials } })`. This ensures 100% persistence across sessions, even before database schema migrations are applied.
+  - `public.profiles`: Upserts full records (`id, first_name, last_name, phone, email, country, monogram_initials, updated_at`). Gracefully catches schema errors and falls back to base columns if migrations are pending.
+- **SQL Migration**: Created [`supabase/migrations/20261020_add_country_and_monogram_to_profiles.sql`](file:///c:/Users/crisi/Downloads/nextjs-ecommerce-template-main/nextjs-ecommerce-template-main/supabase/migrations/20261020_add_country_and_monogram_to_profiles.sql) adding `country text` and `monogram_initials text` to `public.profiles`, with updated `handle_new_user()` trigger logic.
+
+### 2. Country/Region Library Integration (`country-state-city`)
+- **Global Country Catalog**:
+  - Leverages `Country.getAllCountries()` from the pre-installed `country-state-city` package.
+  - Formatted with flag emojis and country names for an international bespoke experience.
+- **Initial Empty State**:
+  - Starts with an empty string (`country: ""`) and placeholder `"Select Country / Region"`.
+  - Only populates once the patron actively selects and saves their home country/region.
+  - Features real-time text search filtering directly inside the dropdown.
+
+### 3. Streamlined Form & Currency Removal
+- **Preferred Currency Deprecated**:
+  - Completely removed the redundant "Preferred Currency" dropdown, label, and component state.
+  - The form layout was rebalanced into an elegant 2-column responsive grid (`Country / Region` on the left, `Monogram Initials` on the right).
+- **Pixel-Perfect Parallel Alignment**:
+  - Unified label structures with consistent typography (`block text-xs uppercase tracking-wider text-[#7A6B5D] mb-2 font-medium`).
+  - Standardized input and dropdown button heights to exactly `46px` (`h-[46px]`) with matching background (`bg-[#FFFAF5]/70`) and borders (`border-[#E3C9A8]/60`), ensuring 100% horizontal and vertical alignment across all columns.
+
+### 4. Dynamic Monogram Initials Synchronization
+- **Character Constraint & Sanitization**:
+  - Limited strictly to **1 or 2 alphabetic characters** (`maxLength={2}`).
+  - Automatically strips non-alphabetic inputs and converts characters to uppercase via `e.target.value.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase()`.
+- **Ubiquitous Real-Time Synchronization**:
+  - **Account Top Heading**: Displays the monogram inside the luxury bronze seal (`monogramDisplay`), reacting dynamically both while typing and on save.
+  - **Desktop Navbar Button**: Replaces the generic user icon with a personalized circular monogram seal button (`w-9 h-9 border border-[#E3C9A8] bg-[#FFFAF5] text-[#3D2B1F] text-xs font-bold font-mono`).
+  - **User Dropdown Popover**: Displays the monogram initials avatar badge directly alongside the patron's name and tier.
+  - **Mobile Sidebar Drawer**: Replaces the generic initial with the unified 1-2 character monogram avatar.
+  - **Cross-Component Reactivity**: Dispatches `patron-profile-updated` custom DOM events to instantly synchronize the navigation bar without page reloads.
+
+---
+
 *Documentation maintained for The Handmade Vendor repository.*
+
 
 
