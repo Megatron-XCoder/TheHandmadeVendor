@@ -1,56 +1,19 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-
-interface OrderItem {
-  id: string;
-  product_id: string;
-  title: string;
-  price: number;
-  quantity: number;
-  image?: string;
-}
-
-interface Order {
-  id: string;
-  order_number: string;
-  created_at: string;
-  status: "Processing" | "Artisan Crafting" | "Quality Inspection" | "Dispatched" | "Delivered" | "Cancelled";
-  total_amount: number;
-  subtotal: number;
-  customer_name: string;
-  customer_email: string;
-  tracking_number?: string;
-  estimated_delivery?: string;
-  atelier_notes?: string;
-  order_items?: OrderItem[];
-}
-
-const statusColorMap: Record<string, { bg: string; text: string; border: string }> = {
-  Processing: { bg: "#FFFBEB", text: "#B45309", border: "#FDE68A" },
-  "Artisan Crafting": { bg: "#FEF5EC", text: "#C4896A", border: "#E3C9A8" },
-  "Quality Inspection": { bg: "#FDF4FF", text: "#86198F", border: "#F5D0FE" },
-  Dispatched: { bg: "#EFF6FF", text: "#1D4ED8", border: "#BFDBFE" },
-  Delivered: { bg: "#ECFDF5", text: "#047857", border: "#A7F3D0" },
-  Cancelled: { bg: "#FEF2F2", text: "#B91C1C", border: "#FECACA" },
-};
-
-const stages = [
-  { key: "Processing", title: "Order Confirmed", desc: "Order authenticated by atelier concierge" },
-  { key: "Artisan Crafting", title: "Artisan Crafting", desc: "Handcrafted with precision in Florence" },
-  { key: "Quality Inspection", title: "Quality Inspection", desc: "Leather validation and hallmark verification" },
-  { key: "Dispatched", title: "White-Glove Dispatch", desc: "Express insured courier transit" },
-  { key: "Delivered", title: "Delivered", desc: "Received at private destination" },
-];
-
 import AtelierTable from "../Common/AtelierTable";
+import AtelierDropdown, { DropdownItem } from "../Common/AtelierDropdown";
 import { ColumnDef } from "@tanstack/react-table";
+import OrderTrackingModal, { Order, statusColorMap } from "./OrderTrackingModal";
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Mobile-only sort state
+  const [mobileSortBy, setMobileSortBy] = useState<string>("date-desc");
 
   useEffect(() => {
     fetch("/api/orders")
@@ -66,12 +29,51 @@ export default function Orders() {
       });
   }, []);
 
+  // Mobile sort options
+  const mobileSortOptions: DropdownItem[] = [
+    { id: "date-desc", label: "Date: Newest First" },
+    { id: "date-asc", label: "Date: Oldest First" },
+    { id: "ref-asc", label: "Order Ref: Low to High" },
+    { id: "ref-desc", label: "Order Ref: High to Low" },
+    { id: "total-desc", label: "Total: High to Low" },
+    { id: "total-asc", label: "Total: Low to High" },
+    { id: "status", label: "Atelier Status" },
+  ];
+
+  // Sorted orders strictly for mobile view
+  const sortedMobileOrders = useMemo(() => {
+    const list = [...orders];
+    switch (mobileSortBy) {
+      case "date-desc":
+        return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      case "date-asc":
+        return list.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      case "ref-asc":
+        return list.sort((a, b) => a.order_number.localeCompare(b.order_number, undefined, { numeric: true }));
+      case "ref-desc":
+        return list.sort((a, b) => b.order_number.localeCompare(a.order_number, undefined, { numeric: true }));
+      case "total-desc":
+        return list.sort((a, b) => Number(b.total_amount) - Number(a.total_amount));
+      case "total-asc":
+        return list.sort((a, b) => Number(a.total_amount) - Number(b.total_amount));
+      case "status":
+        return list.sort((a, b) => a.status.localeCompare(b.status));
+      default:
+        return list;
+    }
+  }, [orders, mobileSortBy]);
+
+  // Desktop Table Columns (Clean alignment, no line wrapping, luxury styling)
   const columns: ColumnDef<Order>[] = [
     {
       accessorKey: "order_number",
       header: "Order Ref",
+      meta: { className: "w-[150px] whitespace-nowrap", align: "left" },
       cell: ({ row }) => (
-        <span className="font-medium text-[#C4896A]">
+        <span
+          className="font-semibold text-xs tracking-wider text-[#C4896A] whitespace-nowrap"
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
           #{row.original.order_number}
         </span>
       ),
@@ -79,8 +81,9 @@ export default function Orders() {
     {
       accessorKey: "created_at",
       header: "Date",
+      meta: { className: "w-[140px] whitespace-nowrap", align: "left" },
       cell: ({ row }) => (
-        <span className="text-[#7A6B5D]">
+        <span className="text-xs text-[#7A6B5D] font-medium whitespace-nowrap">
           {new Date(row.original.created_at).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -92,55 +95,83 @@ export default function Orders() {
     {
       accessorKey: "status",
       header: "Atelier Status",
+      meta: { className: "w-[170px] whitespace-nowrap", align: "center" },
       cell: ({ row }) => {
         const badgeStyle = statusColorMap[row.original.status] || statusColorMap.Processing;
         return (
-          <span
-            className="inline-block px-3 py-1 rounded-full text-xs font-medium border"
-            style={{
-              background: badgeStyle.bg,
-              color: badgeStyle.text,
-              borderColor: badgeStyle.border,
-            }}
-          >
-            {row.original.status}
-          </span>
+          <div className="flex justify-center">
+            <span
+              className="inline-flex items-center px-3.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider border shadow-2xs whitespace-nowrap"
+              style={{
+                background: badgeStyle.bg,
+                color: badgeStyle.text,
+                borderColor: badgeStyle.border,
+              }}
+            >
+              {row.original.status}
+            </span>
+          </div>
         );
       },
     },
     {
       id: "items",
       header: "Items",
-      cell: ({ row }) => (
-        <span className="text-[#7A6B5D]">
-          {row.original.order_items && row.original.order_items.length > 0
-            ? `${row.original.order_items[0].title} ${
-                row.original.order_items.length > 1
-                  ? `(+${row.original.order_items.length - 1} more)`
-                  : ""
-              }`
-            : "1 Creation"}
-        </span>
-      ),
+      meta: { className: "min-w-[220px]", align: "left" },
+      cell: ({ row }) => {
+        const items = row.original.order_items || [];
+        const firstItem = items[0];
+        const extraCount = items.length - 1;
+        return (
+          <div className="flex items-center gap-3">
+            {firstItem?.image ? (
+              <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E3C9A8]/70 relative flex-shrink-0 bg-[#FFFAF5] shadow-2xs">
+                <Image src={firstItem.image} alt={firstItem.title} fill className="object-cover" />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-[#FEF5EC] border border-[#E3C9A8]/70 flex items-center justify-center text-[#C4896A] text-xs flex-shrink-0 font-serif">
+                ✦
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[#2A1E17] truncate max-w-[230px]">
+                {firstItem ? firstItem.title : "Custom Masterpiece"}
+              </p>
+              {extraCount > 0 ? (
+                <span className="text-[10px] text-[#C4896A] font-semibold tracking-wide">
+                  +{extraCount} more {extraCount === 1 ? "piece" : "pieces"}
+                </span>
+              ) : (
+                <span className="text-[10px] text-[#7A6B5D]">1 piece</span>
+              )}
+            </div>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "total_amount",
       header: "Total",
+      meta: { className: "w-[130px] whitespace-nowrap", align: "right" },
       cell: ({ row }) => (
-        <span className="font-semibold text-[#3D2B1F]">
+        <span
+          className="font-bold text-sm text-[#2A1E17] whitespace-nowrap"
+          style={{ fontFamily: "'Cinzel', serif" }}
+        >
           ${Number(row.original.total_amount).toFixed(2)}
         </span>
       ),
     },
     {
       id: "actions",
-      header: () => <div className="text-right">Delivery Details</div>,
+      header: "Delivery Details",
+      meta: { className: "w-[160px] whitespace-nowrap", align: "right" },
       cell: ({ row }) => (
-        <div className="text-right">
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => setSelectedOrder(row.original)}
-            className="py-1.5 px-4 rounded-full text-xs font-semibold tracking-wider uppercase border border-[#C4896A] text-[#C4896A] hover:bg-[#C4896A] hover:text-white transition-all duration-300"
+            className="py-1.5 px-4 rounded-full text-[11px] font-semibold tracking-wider uppercase border border-[#C4896A] text-[#C4896A] hover:bg-[#3D2B1F] hover:text-[#E3C9A8] hover:border-[#3D2B1F] transition-all duration-300 whitespace-nowrap shadow-xs"
             style={{ fontFamily: "'Cinzel', serif" }}
           >
             Track Atelier
@@ -149,11 +180,6 @@ export default function Orders() {
       ),
     },
   ];
-
-  const getStageIndex = (status: string) => {
-    const idx = stages.findIndex((s) => s.key === status);
-    return idx >= 0 ? idx : 0;
-  };
 
   if (loading) {
     return (
@@ -194,157 +220,172 @@ export default function Orders() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
-          <AtelierTable data={orders} columns={columns} pageSize={6} />
+        <div className="space-y-6">
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* MOBILE VIEW ONLY: Zero Horizontal Scroll & Front-Facing Cards */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          <div className="block md:hidden space-y-4">
+            {/* Mobile Heading Sort Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#FFFAF5] border border-[#E3C9A8]/60 shadow-[0_2px_12px_rgba(61,43,31,0.03)]">
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-xs font-semibold uppercase tracking-wider text-[#3D2B1F]"
+                  style={{ fontFamily: "'Cinzel', serif" }}
+                >
+                  {orders.length} {orders.length === 1 ? "Acquisition" : "Acquisitions"}
+                </span>
+              </div>
+
+              <div className="w-full sm:w-56">
+                <AtelierDropdown
+                  items={mobileSortOptions}
+                  selectedId={mobileSortBy}
+                  onSelect={(id) => setMobileSortBy(id)}
+                  placeholder="Sort By"
+                  className="w-full"
+                  buttonClassName="py-2 px-3 text-xs bg-white rounded-xl border-[#E3C9A8]"
+                />
+              </div>
+            </div>
+
+            {/* Mobile Order Cards (All details front-facing) */}
+            <div className="space-y-3.5">
+              {sortedMobileOrders.map((order) => {
+                const badgeStyle = statusColorMap[order.status] || statusColorMap.Processing;
+                const items = order.order_items || [];
+                const firstItem = items[0];
+                const totalPieces = items.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+                return (
+                  <div
+                    key={order.id || order.order_number}
+                    className="bg-white rounded-2xl border border-[#E3C9A8]/70 p-4.5 shadow-[0_4px_16px_rgba(61,43,31,0.04)] space-y-3.5 hover:border-[#C4896A] transition-all duration-200"
+                  >
+                    {/* Header Row: Order Reference & Status Pill */}
+                    <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E3C9A8]/30">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[10px] text-[#C4896A]">✦</span>
+                        <span
+                          className="text-sm font-bold tracking-wider text-[#3D2B1F] truncate"
+                          style={{ fontFamily: "'Cinzel', serif" }}
+                        >
+                          #{order.order_number}
+                        </span>
+                      </div>
+                      <span
+                        className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border shadow-2xs flex-shrink-0"
+                        style={{
+                          background: badgeStyle.bg,
+                          color: badgeStyle.text,
+                          borderColor: badgeStyle.border,
+                        }}
+                      >
+                        {order.status}
+                      </span>
+                    </div>
+
+                    {/* Meta Row: Date & Total Amount */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-[#7A6B5D]">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                          <line x1="16" y1="2" x2="16" y2="6" />
+                          <line x1="8" y1="2" x2="8" y2="6" />
+                          <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        <span>
+                          {new Date(order.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-[#A09082]">Acquisition:</span>
+                        <span
+                          className="text-sm font-bold text-[#2A1E17]"
+                          style={{ fontFamily: "'Cinzel', serif" }}
+                        >
+                          ${Number(order.total_amount).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Creations Preview Box */}
+                    <div className="p-3 rounded-xl bg-[#FFFAF5] border border-[#E3C9A8]/50 flex items-center gap-3">
+                      {firstItem?.image ? (
+                        <div className="w-11 h-11 rounded-lg overflow-hidden border border-[#E3C9A8] relative flex-shrink-0 bg-white shadow-2xs">
+                          <Image src={firstItem.image} alt={firstItem.title} fill className="object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-11 h-11 rounded-lg bg-[#FEF5EC] border border-[#E3C9A8] flex items-center justify-center text-[#C4896A] text-sm flex-shrink-0 font-serif">
+                          ✦
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-[#2A1E17] truncate">
+                          {firstItem ? firstItem.title : "Custom Masterpiece Creation"}
+                        </p>
+                        <p className="text-[11px] text-[#7A6B5D] mt-0.5">
+                          {items.length > 1
+                            ? `${items.length} items (${totalPieces} pieces)`
+                            : items.length === 1
+                            ? `1 creation (${firstItem.quantity || 1} piece)`
+                            : "Bespoke acquisition"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Estimated Delivery (if provided) */}
+                    {order.estimated_delivery && (
+                      <div className="text-[11px] text-[#7A6B5D] px-1 flex items-center gap-1.5">
+                        <span className="text-[#C4896A]">✦</span>
+                        <span>
+                          Est. Delivery:{" "}
+                          <strong className="text-[#3D2B1F] font-semibold">
+                            {new Date(order.estimated_delivery).toLocaleDateString("en-US", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </strong>
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Action Button: Directly opens OrderTrackingModal */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(order)}
+                      className="w-full py-2.5 px-4 rounded-full text-xs font-semibold tracking-widest uppercase border border-[#C4896A] text-[#C4896A] hover:bg-[#3D2B1F] hover:text-[#E3C9A8] hover:border-[#3D2B1F] bg-[#FFFFFF] transition-all duration-300 shadow-xs flex items-center justify-center gap-2"
+                      style={{ fontFamily: "'Cinzel', serif" }}
+                    >
+                      <span>Track Atelier</span>
+                      <span className="text-[10px]">✦</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* DESKTOP VIEW ONLY: Enhanced, Luxury, Aligned Atelier Table    */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          <div className="hidden md:block">
+            <AtelierTable data={orders} columns={columns} pageSize={6} />
+          </div>
         </div>
       )}
 
       {/* ── BESPOKE DELIVERY TIMELINE MODAL ─────────────────────────────────── */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="w-full max-w-2xl bg-white rounded-3xl border border-[#E3C9A8] p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto"
-            style={{ background: "#FFFFFF" }}
-          >
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setSelectedOrder(null)}
-              className="absolute top-6 right-6 w-8 h-8 rounded-full border border-[#E3C9A8] flex items-center justify-center text-[#7A6B5D] hover:text-[#C4896A] hover:border-[#C4896A] transition-colors"
-            >
-              ✕
-            </button>
-
-            {/* Header */}
-            <div className="mb-6 border-b border-[#E3C9A8]/40 pb-5">
-              <span
-                className="text-[11px] font-semibold tracking-[0.2em] uppercase text-[#C4896A] block mb-1"
-                style={{ fontFamily: "'Cinzel', serif" }}
-              >
-                Bespoke Atelier Order Tracking
-              </span>
-              <h2
-                className="text-xl sm:text-2xl font-semibold text-[#3D2B1F]"
-                style={{ fontFamily: "'Cinzel', serif" }}
-              >
-                Order #{selectedOrder.order_number}
-              </h2>
-              {selectedOrder.estimated_delivery && (
-                <p className="text-xs text-[#7A6B5D] mt-1">
-                  Estimated Delivery:{" "}
-                  <strong className="text-[#3D2B1F]">
-                    {new Date(selectedOrder.estimated_delivery).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </strong>
-                </p>
-              )}
-            </div>
-
-            {/* Atelier Crafting Timeline Progress */}
-            <div className="mb-8 p-6 rounded-2xl bg-[#FFFAF5] border border-[#E3C9A8]/60">
-              <h4
-                className="text-xs font-semibold tracking-wider uppercase text-[#3D2B1F] mb-6"
-                style={{ fontFamily: "'Cinzel', serif" }}
-              >
-                Atelier Creation Progress
-              </h4>
-              <div className="relative">
-                {stages.map((stage, idx) => {
-                  const currentIdx = getStageIndex(selectedOrder.status);
-                  const isCompleted = idx < currentIdx;
-                  const isCurrent = idx === currentIdx;
-
-                  return (
-                    <div key={stage.key} className="flex items-start gap-4 mb-6 last:mb-0 relative">
-                      {idx !== stages.length - 1 && (
-                        <div
-                          className={`absolute left-3.5 top-7 w-0.5 h-10 ${
-                            isCompleted ? "bg-[#C4896A]" : "bg-[#E3C9A8]/40"
-                          }`}
-                        />
-                      )}
-                      <div
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 z-10 transition-colors ${
-                          isCompleted
-                            ? "bg-[#C4896A] text-white"
-                            : isCurrent
-                            ? "bg-[#3D2B1F] text-white ring-4 ring-[#E3C9A8]"
-                            : "bg-white border border-[#E3C9A8] text-[#A09082]"
-                        }`}
-                      >
-                        {isCompleted ? "✓" : idx + 1}
-                      </div>
-                      <div>
-                        <h5
-                          className={`text-xs font-semibold uppercase tracking-wider ${
-                            isCurrent ? "text-[#C4896A]" : "text-[#3D2B1F]"
-                          }`}
-                          style={{ fontFamily: "'Cinzel', serif" }}
-                        >
-                          {stage.title}
-                        </h5>
-                        <p className="text-[11px] text-[#7A6B5D] leading-relaxed mt-0.5">
-                          {stage.desc}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Ordered Creations List */}
-            {selectedOrder.order_items && selectedOrder.order_items.length > 0 && (
-              <div className="mb-6">
-                <h4
-                  className="text-xs font-semibold tracking-wider uppercase text-[#3D2B1F] mb-3"
-                  style={{ fontFamily: "'Cinzel', serif" }}
-                >
-                  Commissioned Creations
-                </h4>
-                <div className="divide-y divide-[#E3C9A8]/30 border border-[#E3C9A8]/40 rounded-xl overflow-hidden">
-                  {selectedOrder.order_items.map((item) => (
-                    <div key={item.id} className="p-3.5 flex items-center justify-between text-xs sm:text-sm">
-                      <div className="flex items-center gap-3">
-                        {item.image && (
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E3C9A8] relative flex-shrink-0">
-                            <Image src={item.image} alt={item.title} fill className="object-cover" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-[#3D2B1F]">{item.title}</p>
-                          <span className="text-[11px] text-[#7A6B5D]">Qty: {item.quantity}</span>
-                        </div>
-                      </div>
-                      <p className="font-semibold text-[#3D2B1F]">
-                        ${(Number(item.price) * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Total and Concierge Help */}
-            <div className="pt-4 border-t border-[#E3C9A8]/40 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-              <div className="text-[#7A6B5D]">
-                Concierge Assistance:{" "}
-                <a href="mailto:concierge@thehandmadevendor.com" className="text-[#C4896A] hover:underline font-medium">
-                  concierge@thehandmadevendor.com
-                </a>
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-[#3D2B1F]">
-                  Total: ${Number(selectedOrder.total_amount).toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <OrderTrackingModal
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+      />
     </div>
   );
 }

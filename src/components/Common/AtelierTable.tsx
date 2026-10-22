@@ -52,27 +52,47 @@ export default function AtelierTable<TData>({
             {table.getHeaderGroups().map((headerGroup) => (
               <tr
                 key={headerGroup.id}
-                className="bg-[#FFFAF5] border-b border-[#E3C9A8]/60 text-[11px] uppercase tracking-wider text-[#7A6B5D]"
+                className="bg-[#FAF5EF] border-b border-[#E3C9A8]/70 text-[11px] uppercase tracking-wider text-[#7A6B5D]"
                 style={{ fontFamily: "'Cinzel', serif" }}
               >
                 {headerGroup.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const isSorted = header.column.getIsSorted();
+                  const meta = (header.column.columnDef.meta || {}) as {
+                    className?: string;
+                    headerClassName?: string;
+                    cellClassName?: string;
+                    align?: "left" | "center" | "right";
+                  };
+
+                  const alignClass =
+                    meta.align === "right"
+                      ? "text-right"
+                      : meta.align === "center"
+                      ? "text-center"
+                      : "text-left";
+
+                  const flexAlignClass =
+                    meta.align === "right"
+                      ? "justify-end"
+                      : meta.align === "center"
+                      ? "justify-center"
+                      : "justify-start";
 
                   return (
                     <th
                       key={header.id}
-                      className={`py-4 px-6 font-semibold select-none ${
+                      className={`py-4 px-6 font-semibold select-none ${alignClass} ${meta.className || ""} ${meta.headerClassName || ""} ${
                         canSort ? "cursor-pointer hover:text-[#C4896A] transition-colors" : ""
                       }`}
                       onClick={header.column.getToggleSortingHandler()}
                     >
-                      <div className="flex items-center gap-1.5">
+                      <div className={`flex items-center ${flexAlignClass} gap-1.5`}>
                         {header.isPlaceholder
                           ? null
                           : flexRender(header.column.columnDef.header, header.getContext())}
                         {canSort && (
-                          <span className="text-[10px] text-[#C4896A]">
+                          <span className="text-[10px] text-[#C4896A] font-bold">
                             {isSorted === "asc" ? "▲" : isSorted === "desc" ? "▼" : "⇅"}
                           </span>
                         )}
@@ -98,13 +118,31 @@ export default function AtelierTable<TData>({
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="hover:bg-[#FFFAF5]/50 transition-colors duration-150"
+                  className="hover:bg-[#FFFAF5]/60 transition-colors duration-150"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="py-4 px-6 align-middle">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = (cell.column.columnDef.meta || {}) as {
+                      className?: string;
+                      cellClassName?: string;
+                      align?: "left" | "center" | "right";
+                    };
+
+                    const alignClass =
+                      meta.align === "right"
+                        ? "text-right"
+                        : meta.align === "center"
+                        ? "text-center"
+                        : "text-left";
+
+                    return (
+                      <td
+                        key={cell.id}
+                        className={`py-4.5 px-6 align-middle ${alignClass} ${meta.className || ""} ${meta.cellClassName || ""}`}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}

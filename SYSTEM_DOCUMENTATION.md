@@ -1170,8 +1170,59 @@ The **Patron Profile & Atelier Preferences** section of `/my-account` was upgrad
   - **Account Top Heading**: Displays the monogram inside the luxury bronze seal (`monogramDisplay`), reacting dynamically both while typing and on save.
   - **Desktop Navbar Button**: Replaces the generic user icon with a personalized circular monogram seal button (`w-9 h-9 border border-[#E3C9A8] bg-[#FFFAF5] text-[#3D2B1F] text-xs font-bold font-mono`).
   - **User Dropdown Popover**: Displays the monogram initials avatar badge directly alongside the patron's name and tier.
-  - **Mobile Sidebar Drawer**: Replaces the generic initial with the unified 1-2 character monogram avatar.
   - **Cross-Component Reactivity**: Dispatches `patron-profile-updated` custom DOM events to instantly synchronize the navigation bar without page reloads.
+
+### 5. Multi-Order Display in Latest Bespoke Commission
+- **Two Recent Orders View**:
+  - Upgraded the Sanctuary Overview dashboard's "Latest Bespoke Commission" panel from showing only 1 order (`latestOrder`) to displaying up to **2 most recent acquisitions** (`recentOrders = orders.slice(0, 2)`).
+  - Each order displays its order reference number, dynamic status badge, creation count, formatted date, total amount, and a dedicated "Track Masterpiece" action.
+  - When 2 orders are present, the newest acquisition is highlighted with a luxury `Latest` badge.
+### 6. Bespoke Atelier Order Tracking Modal Responsiveness
+- **Desktop 2-Column Architecture**:
+  - Replaced the single-column, vertically overstretched popup with a balanced 2-column desktop grid (`md:grid md:grid-cols-12 md:gap-7 max-w-4xl`).
+  - Left column displays the compact 5-stage **Atelier Creation Progress** timeline.
+  - Right column houses the **Commissioned Creations** product list (scrollable up to `max-h-64`) and insured transit details.
+- **Mobile Adaptive Viewport**:
+  - Smoothly collapses into a single-column layout with adapted edge padding (`p-3 sm:p-6`) and viewport capping (`max-h-[90vh]`).
+- **Sticky Header & Footer**:
+  - The modal card uses `flex flex-col overflow-hidden` with a sticky top header (order ref, status pill, delivery date, and `✕` close button) and sticky bottom footer (concierge support and total amount) that never scroll away.
+  - The modal body is the only independently scrollable area.
+- **Z-Index & Dismissal Protections**:
+  - Elevated overlay to `z-[99999]` to resolve z-index collision with the sticky navigation header (`zIndex: 9999`).
+  - Supports click-outside-to-dismiss, `Escape` key shortcut, and automatic background body scroll locking.
+
+### 7. Decoupled Order Tracking and Tab Navigation
+- **Shared Reusable Component**:
+  - Extracted tracking logic into `src/components/Orders/OrderTrackingModal.tsx` for shared use across the entire application.
+- **Explicit Action Routing**:
+  - **"View All Orders"**: Directs the patron directly to the full Orders tab (`setActiveTab("orders")`), rendering the provenance table with all historical acquisitions.
+  - **"Track Masterpiece"**: Opens the **Bespoke Atelier Order Tracking** popup modal in-place for that specific order without switching tabs or losing patron dashboard context.
+
+### 8. Responsive Orders Archive (Mobile Cards vs. Desktop Table)
+- **Mobile View (`block md:hidden`)**:
+  - **Zero Horizontal Scrolling**: Completely replaced the horizontal scrolling table on mobile with stacked luxury atelier cards. All order information (Order Ref, Status Pill, Date, Total Acquisition, Creation Preview with Piece Count, Delivery Estimate, and Track Button) is presented directly on the front.
+  - **Heading Sort Dropdown**: Added a prominent sorting control using `AtelierDropdown` directly above the mobile order cards, supporting sorting by:
+    - *Date: Newest First* (Default)
+    - *Date: Oldest First*
+    - *Order Ref: Low to High*
+    - *Order Ref: High to Low*
+    - *Total: High to Low*
+    - *Total: Low to High*
+    - *Atelier Status*
+- **Desktop View (`hidden md:block`)**:
+  - **Aligned Columns & Fixed Widths**: Enhanced `AtelierTable` to support column metadata (`meta: { className, align }`).
+  - **No Awkward Text Wrapping**: Added `whitespace-nowrap` to Order Ref (`w-[150px]`) and Date (`w-[140px]`), preventing broken multi-line references (e.g. `#THV- \n 50613` or `Oct 22, \n 2026`).
+  - **Balanced Headers & Content**: Centered `ATELIER STATUS` pill and header; right-aligned `TOTAL` amount and header; right-aligned `DELIVERY DETAILS` button and header; flexible left-aligned `ITEMS` with thumbnail images and item counts.
+
+### 9. Toast Component Positioning & Cross-Button Dismissal
+- **Snug Top Offset (`top: 56px - 60px`)**:
+  - Previously, `Toaster` container had a hardcoded `top: 80px` plus internal margin, which pushed toasts down to Y = 120px–140px, causing them to cover the user's name ("SARAT KUMAR DAS") in the account card banner.
+  - Reduced `containerStyle.top` to `60px` in `layout.tsx` and added responsive CSS rules in `style.css` (`top: 56px !important` for mobile `< 640px` and `top: 60px !important` for desktop). The toast now sits cleanly directly underneath the sticky navigation bar without colliding with header content.
+- **Instant Cross-Button Dismissal**:
+  - Previously, the close button used `toast.dismiss(t.id)` with missing CSS classes (`animate-leave`), causing the toast to remain visible on screen until internal timer expiry.
+  - Upgraded close button to invoke `toast.remove(t.id)` with `e.stopPropagation()` and `e.preventDefault()`, which immediately removes the toast from the DOM on click.
+  - Added smooth transition fallback (`t.visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'`) with `duration-200 ease-out`.
+  - Expanded button hit area to `w-8 h-8` with `active:scale-90` tactile feedback for reliable mobile tapping.
 
 ---
 

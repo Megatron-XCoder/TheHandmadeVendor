@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AddressModal from "./AddressModal";
 import Orders from "../Orders";
+import OrderTrackingModal, { Order } from "../Orders/OrderTrackingModal";
 import { createClient } from "@/utils/supabase/client";
 import { showToast } from "@/utils/toast";
 import AtelierDropdown, { DropdownItem } from "../Common/AtelierDropdown";
@@ -45,9 +46,10 @@ export default function MyAccount() {
   const [profile, setProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // Orders summary state
-  const [orders, setOrders] = useState<any[]>([]);
+  // Orders summary & tracking state
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
 
   // Account details form state (initial country is empty as requested)
   const [profileForm, setProfileForm] = useState({
@@ -167,7 +169,7 @@ export default function MyAccount() {
       .finally(() => {
         setLoadingOrders(false);
       });
-  }, []);
+  }, [currentUser?.id]);
 
   // Derived user display values
   const displayName = useMemo(() => {
@@ -220,7 +222,7 @@ export default function MyAccount() {
     ).length;
   }, [orders]);
 
-  const latestOrder = orders.length > 0 ? orders[0] : null;
+  const recentOrders = orders.slice(0, 2);
 
   // Handle Address Save (create or update, with max 3 enforcement and tag management)
   const handleSaveAddress = async (data: SavedAddress) => {
@@ -872,7 +874,7 @@ export default function MyAccount() {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E3C9A8]/30">
                     <div>
                       <span className="text-[11px] font-medium uppercase tracking-widest text-[#C4896A]">
-                        Most Recent Acquisition
+                        {recentOrders.length > 1 ? "Recent Acquisitions" : "Most Recent Acquisition"}
                       </span>
                       <h2
                         className="text-xl sm:text-2xl font-normal text-[#2A1E17] tracking-wider mt-1"
@@ -886,33 +888,66 @@ export default function MyAccount() {
                       onClick={() => setActiveTab("orders")}
                       className="text-xs font-semibold uppercase tracking-wider text-[#3D2B1F] hover:text-[#C4896A] inline-flex items-center gap-1.5 transition-colors"
                     >
-                      <span>View All Acquisitions</span>
+                      <span>View All Orders</span>
                       <span>→</span>
                     </button>
                   </div>
 
-                  {latestOrder ? (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 p-5 rounded-2xl bg-[#FFFAF5] border border-[#E3C9A8]/40">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-sm text-[#2A1E17]">
-                            Order #{latestOrder.order_number}
-                          </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-widest bg-[#FEF5EC] text-[#C4896A] border border-[#E3C9A8]/60">
-                            {latestOrder.status}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#7A6B5D]">
-                          Placed on {new Date(latestOrder.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} • Total: ${Number(latestOrder.total_amount).toFixed(2)}
-                        </p>
-                      </div>
+                  {recentOrders.length > 0 ? (
+                    <div className="space-y-4">
+                      {recentOrders.map((order, idx) => (
+                        <div
+                          key={order.id || order.order_number || idx}
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 p-5 rounded-2xl bg-[#FFFAF5] border border-[#E3C9A8]/40 hover:border-[#C4896A] transition-all duration-200"
+                        >
+                          <div className="space-y-1.5 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <span className="font-semibold text-sm text-[#2A1E17]">
+                                Order #{order.order_number}
+                              </span>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-widest border ${
+                                  order.status === "Delivered"
+                                    ? "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]"
+                                    : order.status === "Dispatched"
+                                    ? "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]"
+                                    : "bg-[#FEF5EC] text-[#C4896A] border-[#E3C9A8]/60"
+                                }`}
+                              >
+                                {order.status}
+                              </span>
+                              {idx === 0 && recentOrders.length > 1 && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#3D2B1F] text-[#E3C9A8]">
+                                  Latest
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#7A6B5D]">
+                              Placed on{" "}
+                              {new Date(order.created_at).toLocaleDateString("en-US", {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              })}{" "}
+                              • Total: ${Number(order.total_amount).toFixed(2)}
+                              {order.order_items && order.order_items.length > 0 && (
+                                <span className="ml-1 text-[#A8988B]">
+                                  • {order.order_items.length}{" "}
+                                  {order.order_items.length === 1 ? "creation" : "creations"}
+                                </span>
+                              )}
+                            </p>
+                          </div>
 
-                      <button
-                        onClick={() => setActiveTab("orders")}
-                        className="px-6 py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-sm"
-                      >
-                        Track Masterpiece
-                      </button>
+                          <button
+                            type="button"
+                            onClick={() => setTrackingOrder(order)}
+                            className="px-6 py-2.5 rounded-full bg-[#3D2B1F] hover:bg-[#C4896A] text-white text-xs font-medium tracking-widest uppercase transition-all duration-300 shadow-sm flex-shrink-0"
+                          >
+                            Track Masterpiece
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-10 px-4 rounded-2xl bg-[#FFFAF5] border border-[#E3C9A8]/30">
@@ -1554,6 +1589,12 @@ export default function MyAccount() {
           </div>
         </div>
       )}
+
+      {/* ── BESPOKE ORDER TRACKING POPUP MODAL ───────────────────────── */}
+      <OrderTrackingModal
+        order={trackingOrder}
+        onClose={() => setTrackingOrder(null)}
+      />
     </section>
   );
 }

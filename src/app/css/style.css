@@ -207,3 +207,18 @@ input[type='search']::-webkit-search-results-decoration {
 .range-slider__range {
   @apply !bg-blue;
 }
+
+/* ── React Hot Toast Atelier Position & Responsive Stacking ─────────────── */
+#_rht_toaster {
+  top: 60px !important;
+  right: 16px !important;
+  pointer-events: none !important;
+  z-index: 9999999 !important;
+}
+
+@media (max-width: 640px) {
+  #_rht_toaster {
+    top: 56px !important;
+    right: 12px !important;
+  }
+}

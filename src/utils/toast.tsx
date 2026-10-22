@@ -48,11 +48,13 @@ const ToastIcon = ({ type }: { type: ToastType }) => {
 const CustomToast = ({ t, message, type = 'success' }: ToastProps) => (
   <div
     className={`${
-      t.visible ? 'animate-enter' : 'animate-leave'
-    } max-w-md w-auto bg-[#FFFAF5] shadow-[0_12px_36px_rgba(61,43,31,0.14)] rounded-2xl pointer-events-auto flex items-center border border-[#E3C9A8] overflow-hidden px-2.5 py-2 backdrop-blur-md transition-all duration-300`}
+      t.visible
+        ? 'opacity-100 translate-y-0 scale-100'
+        : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'
+    } max-w-md w-auto bg-[#FFFAF5] shadow-[0_12px_36px_rgba(61,43,31,0.14)] rounded-2xl pointer-events-auto flex items-center border border-[#E3C9A8] overflow-hidden px-3 py-2.5 backdrop-blur-md transition-all duration-200 ease-out`}
   >
-    <div className="flex items-center gap-3 pl-1 py-0.5 flex-1 min-w-0">
-      <div className="flex-shrink-0 text-[#C4896A] bg-[#FEF5EC] p-2 rounded-xl border border-[#E3C9A8]/60 shadow-sm">
+    <div className="flex items-center gap-3 pl-0.5 py-0.5 flex-1 min-w-0">
+      <div className="flex-shrink-0 text-[#C4896A] bg-[#FEF5EC] p-2 rounded-xl border border-[#E3C9A8]/60 shadow-xs">
         <ToastIcon type={type} />
       </div>
       <div className="flex-1 pr-1 min-w-0">
@@ -61,13 +63,28 @@ const CustomToast = ({ t, message, type = 'success' }: ToastProps) => (
         </p>
       </div>
     </div>
-    <div className="flex border-l border-[#E3C9A8]/50 ml-2 pl-2 flex-shrink-0">
+    <div className="flex border-l border-[#E3C9A8]/50 ml-2.5 pl-2 flex-shrink-0">
       <button
-        onClick={() => toast.dismiss(t.id)}
-        className="w-7 h-7 rounded-full flex items-center justify-center text-[#C4896A]/70 hover:text-[#C4896A] hover:bg-[#FEF5EC] focus:outline-none transition-all duration-200"
+        type="button"
+        aria-label="Close notification"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toast.remove(t.id);
+        }}
+        className="w-8 h-8 rounded-full flex items-center justify-center text-[#C4896A]/80 hover:text-[#3D2B1F] hover:bg-[#FEF5EC] active:scale-90 focus:outline-none transition-all duration-150 cursor-pointer"
       >
         <span className="sr-only">Close</span>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>

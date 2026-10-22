@@ -96,11 +96,9 @@ const SingleItem = ({ item }: { item: WishlistItemType }) => {
         <div className="flex items-center justify-between">
           <button
             onClick={handleAddToCart}
-            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold text-white transition-all duration-300 shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-white transition-all duration-300 shadow-sm"
             style={{
-              background: "#876651ff",
-              fontFamily: "'Cinzel', serif",
-              letterSpacing: "0.08em",
+              background: "#3D2B1F",
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLElement).style.background = "#C4896A";
