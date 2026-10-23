@@ -64,11 +64,22 @@
     - [Destructive Action Confirmation Modal & High-Contrast Luxury Theme](#destructive-action-confirmation-modal--high-contrast-luxury-theme)
     - [Multi-Tier Route Protection Architecture (`/my-account`)](#multi-tier-route-protection-architecture-my-account)
     - [Post-Sign-In Redirection Flow](#post-sign-in-redirection-flow)
-16. [Daily Work Updates & Engineering Changelog (October 15–16, 2026)](#16-daily-work-updates--engineering-changelog-october-1516-2026)
-    - [Summary of Completed Tasks & Objectives](#summary-of-completed-tasks--objectives)
-    - [Architecture & Implementation Highlights](#architecture--implementation-highlights)
-    - [Key Bug Fixes & Edge Case Solutions](#key-bug-fixes--edge-case-solutions)
-    - [Verification, Build & Test Results](#verification-build--test-results)
+16. [Security & Master Security Key Architecture](#16-security--master-security-key-architecture)
+    - [Master Security Key Credentials Security](#1-master-security-key-credentials-security-srccomponentsmyaccountindextsx)
+    - [Show/Hide Key Toggles](#showhide-key-toggles)
+17. [Patron Profile & Monogram Initials Architecture (`/my-account`)](#17-patron-profile--monogram-initials-architecture-my-account)
+    - [Database Persistence & Country Integration](#1-database-persistence-publicprofiles--authusers)
+    - [Streamlined Form & Monogram Synchronization](#3-streamlined-form--currency-removal)
+    - [Order Tracking Modal Responsiveness & Orders Archive](#6-bespoke-atelier-order-tracking-modal-responsiveness)
+18. [Checkout Refinements, Typography Scaling & Responsive Atelier Flow (October 23, 2026)](#18-checkout-refinements-typography-scaling--responsive-atelier-flow-october-23-2026)
+    - [Desktop Font Size Scaling & Clutter Elimination](#1-desktop-font-size-scaling--clutter-elimination)
+    - [Order Summary Trust Features Strip Removal](#2-order-summary-trust-features-strip-removal)
+    - [Password Visibility Toggle SVG Icon Precision](#3-password-visibility-toggle-svg-icon-precision)
+    - [Delivery Destination (Step 2) Complete Remake & Responsive Alignment](#4-delivery-destination-step-2-complete-remake--responsive-alignment)
+    - [Full Address Display & Literal "Default" Keyword Preservation](#5-full-address-display--literal-default-keyword-preservation)
+    - [Ship to Alternate Destination (Gift / Other Recipient) Grid](#6-ship-to-alternate-destination-gift--other-recipient-grid)
+    - [Payment Method (Step 3) Remake & Expandable Confirmation Drawers](#7-payment-method-step-3-remake--expandable-confirmation-drawers)
+    - [Responsive Viewport Verification (Desktop 1440px & Mobile 390px)](#8-responsive-viewport-verification-desktop-1440px--mobile-390px)
 
 ---
 
@@ -1223,6 +1234,143 @@ The **Patron Profile & Atelier Preferences** section of `/my-account` was upgrad
   - Upgraded close button to invoke `toast.remove(t.id)` with `e.stopPropagation()` and `e.preventDefault()`, which immediately removes the toast from the DOM on click.
   - Added smooth transition fallback (`t.visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-2 scale-95 pointer-events-none'`) with `duration-200 ease-out`.
   - Expanded button hit area to `w-8 h-8` with `active:scale-90` tactile feedback for reliable mobile tapping.
+
+### 10. Luxury Checkout Page Architecture & Patron Delivery Book (`/checkout`)
+- **Visual Identity & Brand Tokens**:
+  - Remade the entire checkout experience with luxury atelier palette: Warm Alabaster (`#FFFAF5`), crisp white cards (`#FFFFFF`), gold/amber borders (`#E3C9A8`), Roman serif typography (`'Cinzel', serif`), and deep espresso accents (`#3D2B1F`).
+  - Added atmospheric trust banner highlighting vault encryption, generational hallmark guarantees, and white-glove courier dispatch.
+- **Case 1 & Case 3 (Guest / Unauthenticated User)**:
+  - If the visitor is not logged in, presents a dual-option **Patron Authentication** gateway card:
+    - **Tab 1: Existing Patron? Sign In**: Provides an inline login interface with email, password with show/hide toggle, "Forgot Key?" link, Google OAuth option, and loading feedback. Upon successful sign-in, seamlessly loads their profile and saved delivery book without page refresh.
+    - **Tab 2: New Patron? Register**: Explains why an atelier account is required (provenance hallmark records and insured courier tracking) and provides a prominent **"Create Patron Account (Opens in New Tab)"** button with `target="_blank" rel="noopener noreferrer"` directing to `/signup?redirect=/checkout`.
+- **Case 2 (Authenticated Patron)**:
+  - When the patron is logged in, the login prompt is completely suppressed.
+  - Displays a **Verified Patron Banner** with dynamic monogram crest avatar, patron full name, email, and account switcher.
+  - Displays the **Delivery Book** (`X / 3 Max Addresses`):
+    - Lists saved address cards with tag badges (`Default`, `Home`, `Others`), recipient name, complete street/city/country information, phone, and selection checkmark indicator.
+    - The `Default` address is automatically pre-selected.
+    - Includes a **"Deliver to a Different Address"** option with smooth expandable form fields (First/Last Name, Phone, Email, Cascading Country/State/City via `country-state-city` and `AtelierDropdown`) and optional "Save this destination to my Delivery Book" checkbox.
+- **Case 4 (Logged-In Patron with Zero Saved Addresses)**:
+  - When a logged-in user has no addresses on file, renders an encouraging empty-state card with a **"+ Add Delivery Address"** button.
+  - Clicking this button launches the **AddressModal** ("New Atelier Destination - Add Delivery Address") directly over the checkout page. Once saved via `saveAddress`, it automatically populates the delivery book, selects the destination, and enables express order placement.
+- **Minimalist Luxury Redesign & Mobile View Refinements**:
+  - Removed cluttered elements: removed the *"Have an Atelier Privilege Voucher?"* and *"Courier Transit Method"* blocks for a streamlined, high-end editorial feel.
+  - Replaced the large multi-line hero banner with a clean, understated header (`"Checkout"` with subtitle `"Bespoke Handcrafted Commission • White-Glove Transit"`).
+  - Streamlined payment method options into compact, minimalist luxury selector pills (Credit Card, Direct Wire, Cash on Delivery).
+  - Added a responsive **Mobile Collapsible Order Summary Accordion** at the top of the mobile viewport, allowing patrons on smartphones to toggle order items on demand while keeping the total price immediately visible without scrolling.
+  - Refined patron badge and delivery address cards to be compact, eliminating awkward text wrapping and excessive vertical scroll space.
+
+---
+
+## 18. Checkout Refinements, Typography Scaling & Responsive Atelier Flow (October 23, 2026)
+
+### Overview
+On **October 23, 2026**, the checkout experience at `/checkout` (`src/components/Checkout/index.tsx`) underwent a comprehensive architectural and UI/UX remake. The objectives were to eliminate oversized desktop typography, remove visual clutter from the order summary, correct SVG vector paths for password toggles, enforce data integrity with literal `"Default"` address tags, and completely re-engineer both the **Delivery Destination (Step 2)** and **Payment Method (Step 3)** sections for alignment, aesthetic balance, and fluid responsiveness across desktop and mobile devices.
+
+---
+
+### 1. Desktop Font Size Scaling & Clutter Elimination
+- **Problem**: Heading fonts and section titles on desktop appeared oversized, and lengthy guide paragraphs dominated the layout, creating an overly chunky appearance that conflicted with the brand's minimalist luxury philosophy.
+- **Implementation**:
+  - Scaled down the main checkout heading to `text-xl sm:text-2xl lg:text-3xl font-semibold` using Roman serif `'Cinzel', serif`.
+  - Scaled the subtitle to an understated `text-xs sm:text-sm text-[#7A6B5D]`.
+  - Standardized step titles (`Step 1`, `Step 2`, `Step 3`) to `text-sm sm:text-base font-semibold uppercase tracking-wider`.
+  - Removed multi-paragraph instructional blocks and redundant explanation banners, creating a clean editorial flow with subtle micro-borders (`border-[#E3C9A8]/40` to `/70`) and warm alabaster backdrops (`#FFFAF5`).
+
+---
+
+### 2. Order Summary Trust Features Strip Removal
+- **Problem**: The Order Summary sidebar previously contained a 3-box vertical feature stack:
+  - 📦 *Insured Care* (Signature delivery)
+  - 📜 *Provenance* (Artisan certificate)
+  - 🔒 *Vault Security* (256-bit encrypted)
+  This consumed excessive vertical height, pushed the primary "Place Order" CTA below the fold, and repeated trust guarantees already highlighted in the header.
+- **Implementation**:
+  - Completely removed the 3-box feature strip from `src/components/Checkout/index.tsx`.
+  - The Order Summary card is now focused strictly on itemized previews, subtotal, complimentary white-glove shipping badge, total calculation, and the primary order confirmation CTA.
+
+---
+
+### 3. Password Visibility Toggle SVG Icon Precision
+- **Problem**: In the inline patron authentication form (Case 1), the password reveal toggle SVG had misaligned coordinates that produced a distorted, broken icon.
+- **Implementation**:
+  - Replaced the inline SVG with standard Feather/Lucide vector paths:
+    - **Eye (Show)**:
+      ```tsx
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+      ```
+    - **EyeOff (Hide)**:
+      ```tsx
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+      ```
+  - Contained within a centered `w-8 h-8 rounded-md hover:bg-[#FEF5EC] text-[#7A6B5D] hover:text-[#C4896A]` interactive button with smooth hover transitions.
+
+---
+
+### 4. Delivery Destination (Step 2) Complete Remake & Responsive Alignment
+- **Problem**: Saved address cards lacked structured alignment:
+  - Address text wrapped underneath the radio indicator circle rather than indenting cleanly with the recipient's name.
+  - The "Edit" button floated as an unstyled text link without button affordance.
+  - The section header used an emoji `📍` rather than a unified SVG icon.
+- **Implementation**:
+  - **Section Header**: Replaced emoji with a crisp SVG MapPin icon inside a `w-7 h-7 rounded-full bg-[#3D2B1F] text-[#E3C9A8]` circular crest, matching Step 3's payment badge. Added `Step 2 • Shipping Destination`, `Cinzel` uppercase heading, `{count}/3 Saved` badge, and responsive `+ Add Address` button with an SVG plus icon.
+  - **Top Row in Card**: Formatted as a flex row with custom radio button (`w-4 h-4`), recipient full name (`text-xs sm:text-sm font-semibold text-[#2A1E17]`), and tag badge on the left; styled `Edit` button on the right with a pencil SVG icon, `#FFFAF5` background, `#E3C9A8` border, and hover state.
+  - **Indented Body Block**: Indented address details (`pl-6.5 sm:pl-7`) so street, city, state, postal code, and country align with the recipient name instead of wrapping under the radio button.
+  - **Contact Row**: Formatted with an SVG phone icon and font-mono contact number (`text-[11px] sm:text-xs text-[#7A6B5D]`).
+  - **Selection State**: Active destination highlighted with warm gold borders (`border-[#C4896A]`), ring focus (`ring-1 ring-[#C4896A]/40`), soft background (`bg-[#FEF5EC]/80`), and filled radio dot.
+
+---
+
+### 5. Full Address Display & Literal "Default" Keyword Preservation
+- **Problem**: Address cards previously used `line-clamp-1`, causing longer street names and city/state text to be clipped with ellipses. Additionally, the default tag name needed to remain strictly `"Default"` to match database schema constraints.
+- **Implementation**:
+  - Removed all `line-clamp-1` rules, applying `break-words text-xs sm:text-sm text-[#4A3B32]` to display the full, complete address without truncation.
+  - Enforced the literal keyword `"Default"` for the default address badge:
+    ```tsx
+    <span
+      className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${
+        addr.tag === "Default"
+          ? "bg-[#3D2B1F] text-[#E3C9A8] shadow-2xs"
+          : "bg-[#FEF5EC] text-[#7A583A] border border-[#E3C9A8]/80"
+      }`}
+    >
+      {addr.tag}
+    </span>
+    ```
+
+---
+
+### 6. Ship to Alternate Destination (Gift / Other Recipient) Grid
+- **Selector Card**: Standardized radio card matching the saved address cards with a `Gift / Other Recipient` badge and `Active` / `Select` status pill.
+- **Expandable Form**:
+  - **Desktop Grid**: 2-column layout (`sm:grid-cols-2`) for recipient names and contact details; 3-column layout (`sm:grid-cols-3`) for `Country`, `State`, and `City` cascading dropdowns via `AtelierDropdown`.
+  - **Mobile Grid**: Automatically collapses into a single-column layout with 42px touch targets and full-width inputs.
+  - **Height Standardization**: Standardized `AtelierDropdown` button heights (`!py-2.5 !text-xs sm:!text-sm !rounded-lg !border-[#E3C9A8] !bg-white`) to match input text boxes with pixel-perfect alignment.
+  - **Postal Code**: Half-width on desktop (`sm:w-1/2`), full-width on mobile.
+  - **Save Option**: "Save this destination to my address book for future orders" checkbox conditionally shown when `addresses.length < MAX_SAVED_ADDRESSES`.
+
+---
+
+### 7. Payment Method (Step 3) Remake & Expandable Confirmation Drawers
+- **Section Header**: Styled circular payment card SVG crest and `Step 3 • Payment` header with `256-Bit SSL Encrypted` badge.
+- **Interactive Payment Method Cards**:
+  1. **Credit or Debit Card**: Instant gateway with `VISA`, `MC`, and `AMEX` brand badges, 3D secure and zero-surcharge trust tags.
+  2. **Direct Bank Transfer**: Bank pillar icon, description, and `Official Invoice` pill with expandable escrow drawer containing IBAN/SWIFT instructions.
+  3. **Cash on Delivery**: Cash bill icon, handover inspection note, and `Pay on Arrival` pill with expandable handover confirmation drawer.
+
+---
+
+### 8. Responsive Viewport Verification (Desktop 1440px & Mobile 390px)
+- **TypeScript Compilation**: Executed `npx tsc --noEmit` with zero errors (exit code `0`).
+- **Visual Validation via Browser Subagent**:
+  - **Desktop (1440×900)**: Clean typography scaling, properly aligned 2-column and 3-column grids, indented address bodies, and clear selection states.
+  - **Mobile (390×844)**: Zero horizontal scrolling or text clipping, stacked form inputs with touch-friendly 42px heights, and cleanly wrapped headers.
 
 ---
 
