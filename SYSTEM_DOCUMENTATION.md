@@ -80,6 +80,12 @@
     - [Ship to Alternate Destination (Gift / Other Recipient) Grid](#6-ship-to-alternate-destination-gift--other-recipient-grid)
     - [Payment Method (Step 3) Remake & Expandable Confirmation Drawers](#7-payment-method-step-3-remake--expandable-confirmation-drawers)
     - [Responsive Viewport Verification (Desktop 1440px & Mobile 390px)](#8-responsive-viewport-verification-desktop-1440px--mobile-390px)
+19. [Atelier Admin Portal & Protected Entry Gate Architecture (November 2, 2026)](#19-atelier-admin-portal--protected-entry-gate-architecture-november-2-2026)
+    - [Footer Store Icon Access Gate](#1-footer-store-icon-access-gate)
+    - [Multi-Tier Protective Route Layer](#2-multi-tier-protective-route-layer)
+    - [Environment Credentials & Security Secrets](#3-environment-credentials--security-secrets)
+    - [Brand-Themed Curator Login Sanctuary](#4-brand-themed-curator-login-sanctuary)
+    - [Admin Dashboard Foundation](#5-admin-dashboard-foundation)
 
 ---
 
@@ -1371,6 +1377,86 @@ On **October 23, 2026**, the checkout experience at `/checkout` (`src/components
 - **Visual Validation via Browser Subagent**:
   - **Desktop (1440×900)**: Clean typography scaling, properly aligned 2-column and 3-column grids, indented address bodies, and clear selection states.
   - **Mobile (390×844)**: Zero horizontal scrolling or text clipping, stacked form inputs with touch-friendly 42px heights, and cleanly wrapped headers.
+
+---
+
+## 19. Atelier Admin Portal & Protected Entry Gate Architecture (November 2, 2026)
+
+### Overview
+On **November 2, 2026**, the foundation for **The Handmade Vendor Admin Panel** was architected and deployed. The platform introduces a discrete, luxury storefront entry portal in the footer, protected route boundaries that prevent direct address-bar navigation, an HMAC-SHA256 entry pass verification system, brand-themed curator login credentials managed via environment variables, and an authenticated administrative dashboard.
+
+---
+
+### 1. Footer Store Icon Access Gate
+- **Location**: In `src/components/Footer/index.tsx`, positioned inside the circular social icons row (`w-10 h-10 rounded-full border border-gray-200`) adjacent to the WhatsApp icon.
+- **Icon Design**: Lucide Storefront boutique architecture SVG, with smooth transition on hover to deep artisan espresso (`#3D2B1F`) and warm champagne gold (`#E3C9A8`).
+- **Interactive Execution**:
+  - Clicking triggers `handleAdminGateAccess`.
+  - Dispatches `POST /api/admin/entry` to generate an HMAC-SHA256 signed entry pass (`thv_admin_entry_pass`) valid for 30 minutes.
+  - If already authenticated as an admin, smoothly routes directly to `/admin`.
+  - If unauthenticated, unlocks the gate and navigates to `/admin/login`.
+
+---
+
+### 2. Multi-Tier Protective Route Layer
+- **Network Boundary Proxy (`src/proxy.ts`)**:
+  - Intercepts all requests starting with `/admin`:
+    - **`/admin/login`**:
+      - If `thv_admin_session` cookie is valid: redirects immediately to `/admin`.
+      - If `thv_admin_entry_pass` cookie is absent or expired: **redirects to `/` (home page)**. Direct URL navigation by curious visitors is completely blocked.
+    - **`/admin` & sub-routes**:
+      - If `thv_admin_session` is valid: allows request through.
+      - If invalid: redirects to `/admin/login` (if entry pass is valid) or `/` (if absent).
+- **Server Component Enforcement**:
+  - `src/app/admin/login/page.tsx` and `src/app/admin/page.tsx` independently evaluate cookies via `next/headers` before rendering, ensuring zero bypass even if proxy logic is altered.
+
+---
+
+### 3. Environment Credentials & Security Secrets
+- **Variables** (`.env` and `.env.local`):
+  ```env
+  # ── Admin Portal Configuration ──────────────────────────────────────────────
+  ADMIN_USERNAME=admin@vendor.com
+  ADMIN_PASSWORD=Handmade@1234
+  ADMIN_SECRET_KEY=thv_artisan_vault_admin_secret_key_2026_cinzel
+  ```
+- **Cryptographic Engine (`src/utils/adminAuth.ts`)**:
+  - Built with universal **Web Crypto API** (`crypto.subtle`) for native Edge and Node.js runtime interoperability.
+  - Generates and verifies HMAC-SHA256 signatures for `thv_admin_entry_pass` (30-min TTL) and `thv_admin_session` (24-hr TTL).
+
+---
+
+### 4. Sleek Minimalist Curator Login UI (`src/components/Admin/Login/index.tsx`)
+- **Route**: `/admin/login`
+- **Homepage-Matching Navbar (`src/components/Admin/AdminNavbar.tsx`)**:
+  - Exact brand logo aesthetic from the storefront navbar: 38×38px framed logo badge (`/images/logo/logo.png`), `"The Handmade"` (gray-800) and `"Vendor"` (`#C4896A`) in `'Cinzel', serif` small-caps typography.
+  - Minimalist pill action: `[Return to Storefront]` (`/`) on the right.
+- **Sleek Minimalist Form Canvas**:
+  - Eliminated chunky decorative watermarks, bloated 56px badges, and excess vertical padding.
+  - Centered luxury card (`max-w-[390px]`, `border-[#E3C9A8]/70`, `rounded-2xl`, `bg-white`, subtle `shadow-[0_8px_30px_rgba(61,43,31,0.05)]`).
+  - Small refined 40px boutique crest, clean Roman serif title (*"Curator Sign In"*), and subtitle (*"Enter master credentials to access atelier console."*).
+  - Streamlined inputs (Curator Username & Master Password with Feather/Lucide `Eye` and `EyeOff` visibility toggle).
+  - High-contrast espresso `#3D2B1F` submit button (`h-11`, letter-spaced uppercase `Cinzel` font) with smooth hover transition to `#C4896A`.
+- **Footer Removal**:
+  - Completely removed the footer from the login page, keeping the viewport clean, focused, and distraction-free.
+
+---
+
+### 5. Admin Dashboard Navbar & Sidebar Navigation (`src/components/Admin/Dashboard/index.tsx`)
+- **Route**: `/admin`
+- **Unified Admin Navbar**:
+  - Uses the same homepage-matching navbar style (`#FFFAF5`, border `#E3C9A8`, logo container).
+  - **Left Side**: Added an accessible **hamburger button** next to the brand logo to toggle the admin sidebar.
+  - **Right Side**:
+    1. `Return to Storefront` live boutique link: visible on desktop view (`sm:inline-flex`), cleanly hidden on mobile view (`hidden sm:inline-flex`) to prevent header overcrowding.
+    2. Curator profile pill (`admin@vendor.com` with monogram avatar and `"Admin"` badge).
+    3. **Sign Out Button Relocation**: Completely removed from the top header bar on both desktop and mobile view; curator authentication termination is now centralized inside the collapsible sidebar drawer.
+- **Slide-Over Admin Sidebar**:
+  - Interactive drawer with smooth backdrop overlay and slide-in transition.
+  - Contains full management navigation: *Sanctuary Overview*, *Bespoke Commissions (Active)*, *Curated Catalogue*, and *Vault Gate & Security (256-Bit)*.
+  - Bottom panel with authenticated curator credentials and one-click actions.
+- **Metrics Overview & Management Hub**:
+  - Real-time status cards for Bespoke Commissions, Curated Catalogue, PostgreSQL Cloud Vault connection, and 256-Bit Gateway Protection.
 
 ---
 
